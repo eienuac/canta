@@ -6,6 +6,7 @@ import { ToastProvider } from '@/components/ui/toaster'
 import { SiteHeader } from '@/components/layout/site-header'
 import { SiteFooter } from '@/components/layout/site-footer'
 import { getHeaderCategories } from '@/services/products'
+import { requireAppAdmin } from '@/lib/admin'
 import { absoluteUrl } from '@/lib/utils'
 import '../globals.css'
 
@@ -74,11 +75,17 @@ async function safeCategories(): Promise<HeaderCategory[]> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   let categories: HeaderCategory[] = []
+  let isAdmin = false
   try {
     categories = await safeCategories()
   } catch (error) {
     console.error('[RootLayout] Unexpected layout data error:', error)
     categories = []
+  }
+  try {
+    isAdmin = Boolean(await requireAppAdmin())
+  } catch {
+    isAdmin = false
   }
 
   return (
@@ -86,7 +93,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={`${display.variable} ${body.variable} antialiased`}>
         <AuthProvider>
           <CartProvider>
-            <SiteHeader categories={categories} />
+            <SiteHeader categories={categories} initialIsAdmin={isAdmin} />
             <main className="min-h-[70vh]">{children}</main>
             <SiteFooter />
             <ToastProvider />

@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { Heart, Menu, Search, ShoppingBag, User, X } from 'lucide-react'
+import { Heart, LayoutDashboard, Menu, Search, ShoppingBag, User, X } from 'lucide-react'
 import { useCart } from '@/hooks/use-cart'
+import { useAuth } from '@/hooks/use-auth'
 import { SearchDialog } from '@/components/layout/search-dialog'
 import { BrandLogo } from '@/components/brand/brand-logo'
 import { cn } from '@/lib/utils'
@@ -19,13 +20,17 @@ const STATIC_LINKS = [
 
 export function SiteHeader({
   categories = [],
+  initialIsAdmin = false,
 }: {
   categories?: Array<{ name: string; slug: string; parentId?: number | null }>
+  initialIsAdmin?: boolean
 }) {
   const { itemCount } = useCart()
+  const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(initialIsAdmin)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12)
@@ -33,6 +38,25 @@ export function SiteHeader({
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  useEffect(() => {
+    if (!user) {
+      setIsAdmin(false)
+      return
+    }
+    let cancelled = false
+    fetch('/api/account/admin-status')
+      .then((r) => r.json())
+      .then((data: { isAdmin?: boolean }) => {
+        if (!cancelled) setIsAdmin(Boolean(data.isAdmin))
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [user])
 
   const dynamicLinks =
     categories.filter((c) => !c.parentId).length > 0
@@ -76,6 +100,15 @@ export function SiteHeader({
           </nav>
 
           <div className="flex items-center justify-end gap-1 sm:gap-2">
+            {isAdmin && (
+              <Link
+                href="/app-admin"
+                className="mr-1 hidden items-center gap-1.5 bg-espresso px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-ivory transition hover:bg-brown-deep sm:inline-flex"
+              >
+                <LayoutDashboard className="h-3.5 w-3.5" strokeWidth={1.75} />
+                Admin
+              </Link>
+            )}
             <button
               type="button"
               aria-label="Ara"
@@ -123,6 +156,15 @@ export function SiteHeader({
                   {link.label}
                 </Link>
               ))}
+              {isAdmin && (
+                <Link
+                  href="/app-admin"
+                  onClick={() => setOpen(false)}
+                  className="mt-2 bg-espresso px-4 py-3 text-center text-sm uppercase tracking-widest text-ivory"
+                >
+                  Admin paneli
+                </Link>
+              )}
               <Link href="/account" onClick={() => setOpen(false)} className="mt-4 text-sm uppercase tracking-widest text-muted">
                 Hesabım
               </Link>

@@ -72,8 +72,11 @@ export default async function AppAdminLayout({ children }: { children: React.Rea
                 {item.label}
               </Link>
             ))}
-            <Link href="/admin" className="hidden text-muted hover:underline md:inline">
-              CMS (Ürünler)
+            <Link
+              href="/admin"
+              className="bg-espresso px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-ivory hover:bg-brown-deep"
+            >
+              CMS · Ürün ekle
             </Link>
             <Link href="/" className="text-muted hover:underline">
               Mağaza
