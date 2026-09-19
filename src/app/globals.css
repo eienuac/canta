@@ -1,16 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --espresso: #2c1e16;
-  --brown-deep: #3d2a20;
-  --leather: #6b4423;
-  --taba: #c4a484;
-  --sand: #e8dcc8;
-  --ivory: #f7f3ec;
-  --cream: #faf7f2;
-  --ink: #1a1410;
-  --muted: #7a6a5c;
-  --border: #e2d6c6;
+  /* Old Money — Dulux S27D9 #2C5C4F */
+  --espresso: #2c5c4f;
+  --brown-deep: #1e3f37;
+  --leather: #3d6b5c;
+  --taba: #c5b48a;
+  --sand: #e6e2d6;
+  --ivory: #f5f3ec;
+  --cream: #f7f5ef;
+  --ink: #14241f;
+  --muted: #5c6b64;
+  --border: #d8ddd6;
   --success: #2f5d3a;
   --danger: #8b2e2e;
   --background: var(--cream);

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Heart, Menu, Search, ShoppingBag, User, X } from 'lucide-react'
 import { useCart } from '@/hooks/use-cart'
 import { SearchDialog } from '@/components/layout/search-dialog'
+import { BrandLogo } from '@/components/brand/brand-logo'
 import { cn } from '@/lib/utils'
 
 const STATIC_LINKS = [
@@ -59,9 +60,7 @@ export function SiteHeader({
             >
               <Menu className="h-5 w-5" strokeWidth={1.5} />
             </button>
-            <Link href="/" className="font-display text-xl tracking-[0.04em] text-espresso md:text-2xl">
-              Seçkin Çanta
-            </Link>
+            <BrandLogo priority className="h-9 md:h-11" />
           </div>
 
           <nav className="hidden items-center gap-7 md:flex">

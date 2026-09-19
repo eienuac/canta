@@ -8,8 +8,8 @@ export function ToastProvider() {
       position="top-center"
       toastOptions={{
         style: {
-          background: '#2c1e16',
-          color: '#f7f3ec',
+          background: '#2c5c4f',
+          color: '#f5f3ec',
           border: 'none',
           borderRadius: 0,
         },

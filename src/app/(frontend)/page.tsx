@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { listProducts, getHomepageContent } from '@/services/products'
 import { ProductCard } from '@/components/product/product-card'
 import { Button } from '@/components/ui/button'
+import { BrandLogo } from '@/components/brand/brand-logo'
 import type { Homepage, Product } from '@/payload-types'
 import type { ProductCardDTO } from '@/types/product'
 
@@ -110,7 +111,7 @@ export default async function HomePage() {
               className="absolute inset-0"
               style={{
                 background:
-                  'radial-gradient(ellipse at 70% 40%, #6b4423 0%, transparent 55%), linear-gradient(135deg, #2c1e16 0%, #3d2a20 45%, #1a1410 100%)',
+                  'radial-gradient(ellipse at 70% 40%, #3d6b5c 0%, transparent 55%), linear-gradient(135deg, #2c5c4f 0%, #1e3f37 45%, #14241f 100%)',
               }}
             />
           )}
@@ -118,7 +119,14 @@ export default async function HomePage() {
         </div>
 
         <div className="container-page relative flex min-h-[88vh] flex-col justify-end pb-20 pt-32 md:justify-center md:pb-24">
-          <p className="mb-6 text-[11px] uppercase tracking-[0.28em] text-taba">Seçkin Çanta</p>
+          <div className="mb-8">
+            <BrandLogo
+              href={null}
+              priority
+              className="h-14 brightness-0 invert md:h-16"
+            />
+          </div>
+          <p className="mb-6 font-display text-2xl tracking-[0.35em] text-taba md:text-3xl">1967</p>
           <h1 className="max-w-xl whitespace-pre-line font-display text-5xl leading-[1.05] md:text-7xl">
             {title}
           </h1>
@@ -143,14 +151,14 @@ export default async function HomePage() {
 
       <section className="container-page grid gap-8 py-20 md:grid-cols-2">
         <Link href="/products?gender=men" className="group relative min-h-[420px] overflow-hidden bg-brown-deep">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#6b4423,transparent_50%)] transition duration-700 group-hover:scale-105" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#3d6b5c,transparent_50%)] transition duration-700 group-hover:scale-105" />
           <div className="absolute inset-0 flex flex-col justify-end p-8 text-ivory">
             <p className="text-[11px] uppercase tracking-[0.2em] text-taba">Koleksiyon</p>
             <h2 className="mt-2 font-display text-4xl">Erkek</h2>
           </div>
         </Link>
         <Link href="/products?gender=women" className="group relative min-h-[420px] overflow-hidden bg-leather">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,#c4a48455,transparent_55%)] transition duration-700 group-hover:scale-105" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,#c5b48a55,transparent_55%)] transition duration-700 group-hover:scale-105" />
           <div className="absolute inset-0 flex flex-col justify-end p-8 text-ivory">
             <p className="text-[11px] uppercase tracking-[0.2em] text-sand">Koleksiyon</p>
             <h2 className="mt-2 font-display text-4xl">Kadın</h2>
