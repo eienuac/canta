@@ -3,7 +3,6 @@ import Image from 'next/image'
 import { listProducts, getHomepageContent } from '@/services/products'
 import { ProductCard } from '@/components/product/product-card'
 import { Button } from '@/components/ui/button'
-import { BrandLogo } from '@/components/brand/brand-logo'
 import type { Homepage, Product } from '@/payload-types'
 import type { ProductCardDTO } from '@/types/product'
 
@@ -119,10 +118,7 @@ export default async function HomePage() {
         </div>
 
         <div className="container-page relative flex min-h-[88vh] flex-col justify-end pb-20 pt-32 md:justify-center md:pb-24">
-          <div className="mb-8">
-            <BrandLogo href={null} priority variant="onDark" className="h-20 md:h-28" />
-          </div>
-          <p className="mb-6 font-display text-2xl tracking-[0.35em] text-taba md:text-3xl">1967</p>
+          <p className="mb-6 font-display text-3xl tracking-[0.4em] text-taba md:text-4xl">1967</p>
           <h1 className="max-w-xl whitespace-pre-line font-display text-5xl leading-[1.05] md:text-7xl">
             {title}
           </h1>
@@ -194,16 +190,6 @@ export default async function HomePage() {
             ))}
           </div>
         </div>
-      </section>
-
-      <section className="container-page py-24 text-center">
-        <h2 className="font-display text-3xl text-espresso md:text-4xl">
-          {homepage?.newsletter?.title || 'Yeniliklerden ilk siz haberdar olun'}
-        </h2>
-        <p className="mx-auto mt-3 max-w-md text-muted">
-          {homepage?.newsletter?.subtitle ||
-            'Koleksiyonlar ve özel davetler için e-posta listemize katılın.'}
-        </p>
       </section>
     </div>
   )

@@ -29,7 +29,7 @@ export function SiteFooter({
     <footer className="mt-24 border-t border-border bg-ivory">
       <div className="container-page grid gap-12 py-16 md:grid-cols-4">
         <div className="md:col-span-1">
-          <BrandLogo className="h-14 md:h-16" />
+          <BrandLogo className="h-16 w-16 md:h-20 md:w-20" />
           <p className="sr-only">{brandName}</p>
           <p className="mt-3 max-w-xs text-sm text-muted">{tagline}</p>
           <div className="mt-6 flex gap-4 text-sm text-espresso">
@@ -81,19 +81,7 @@ export function SiteFooter({
       </div>
 
       <div className="border-t border-border">
-        <div className="container-page flex flex-col gap-6 py-10 md:flex-row md:items-end md:justify-between">
-          <form action="/api/newsletter" method="post" className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
-            <input
-              name="email"
-              type="email"
-              required
-              placeholder="E-posta adresiniz"
-              className="h-11 flex-1 border border-border bg-cream px-3 text-sm outline-none focus:ring-2 focus:ring-leather/20"
-            />
-            <button type="submit" className="h-11 bg-espresso px-5 text-xs uppercase tracking-widest text-ivory">
-              Abone Ol
-            </button>
-          </form>
+        <div className="container-page py-8">
           <p className="text-xs text-muted">© {new Date().getFullYear()} {brandName}. Tüm hakları saklıdır.</p>
         </div>
       </div>
