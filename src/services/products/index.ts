@@ -1,4 +1,5 @@
 import type { Payload, Where } from 'payload'
+import { unstable_cache } from 'next/cache'
 import { getPayloadClient } from '@/lib/payload'
 import { getInventoryBySkus } from '@/services/inventory/sync'
 import type { Category, Media, Product } from '@/payload-types'
@@ -480,14 +481,25 @@ export async function getHomepageContent() {
 }
 
 export async function getHeaderCategories() {
-  const payload = await getPayloadClient()
-  const result = await payload.find({
-    collection: 'categories',
-    where: { showInHeader: { equals: true } },
-    sort: 'navOrder',
-    limit: 50,
-    depth: 1,
-    ...queryOpts,
-  })
-  return result.docs as Category[]
+  return unstable_cache(
+    async () => {
+      try {
+        const payload = await getPayloadClient()
+        const result = await payload.find({
+          collection: 'categories',
+          where: { showInHeader: { equals: true } },
+          sort: 'navOrder',
+          limit: 50,
+          depth: 1,
+          ...queryOpts,
+        })
+        return result.docs as Category[]
+      } catch (error) {
+        console.error('[getHeaderCategories]', error)
+        return [] as Category[]
+      }
+    },
+    ['header-categories'],
+    { revalidate: 120, tags: ['header-categories'] }
+  )()
 }

@@ -101,8 +101,8 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <Button type="button" variant="ghost" className="w-full" onClick={continueAsGuest}>
-          Misafir olarak devam et
+        <Button type="button" variant="secondary" className="w-full" onClick={continueAsGuest}>
+          Müşteri olmadan devam et
         </Button>
 
         <p className="text-center text-sm text-muted">

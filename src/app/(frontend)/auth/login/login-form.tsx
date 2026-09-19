@@ -93,11 +93,11 @@ export default function LoginForm() {
           </div>
         </div>
 
-        <Button type="button" variant="ghost" className="w-full" onClick={continueAsGuest}>
-          Misafir olarak devam et
+        <Button type="button" variant="secondary" className="w-full" onClick={continueAsGuest}>
+          Müşteri olmadan devam et
         </Button>
         <p className="text-center text-xs text-muted">
-          Misafir sepette ürün ekleyebilir; ödeme sırasında e-posta istenebilir.
+          Üye olmadan sepete ekleyebilir ve ödeme adımına geçebilirsiniz.
         </p>
 
         <p className="text-center text-sm text-muted">
