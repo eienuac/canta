@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,12 @@ export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
+
+  useEffect(() => {
+    const err = searchParams.get('error')
+    if (err) toast.error(decodeURIComponent(err))
+  }, [searchParams])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -40,20 +46,41 @@ export default function LoginForm() {
   }
 
   async function google() {
-    const supabase = createClient()
-    const redirectTo = new URL('/auth/callback', window.location.origin)
-    redirectTo.searchParams.set('next', nextPath === '/products' ? '/account' : nextPath)
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: redirectTo.toString() },
-    })
+    setGoogleLoading(true)
+    try {
+      const supabase = createClient()
+      const redirectTo = new URL('/auth/callback', window.location.origin)
+      redirectTo.searchParams.set('next', nextPath === '/products' ? '/account' : nextPath)
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectTo.toString(),
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      })
+      if (error) throw error
+      if (data.url) {
+        window.location.href = data.url
+        return
+      }
+      throw new Error('Google giriş başlatılamadı')
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Google ile giriş açılamadı. Supabase’de Google provider açık mı?'
+      )
+      setGoogleLoading(false)
+    }
   }
 
   function continueAsGuest() {
     toast.message('Misafir olarak devam ediyorsunuz', {
       description: 'Sepet ve favoriler bu cihazda saklanır. İstediğiniz zaman giriş yapabilirsiniz.',
     })
-    // Admin routes require auth — never dump guests onto /app-admin
     router.push(nextPath.startsWith('/app-admin') ? '/products' : nextPath)
   }
 
@@ -77,11 +104,8 @@ export default function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        <Button type="submit" className="w-full" disabled={loading}>
+        <Button type="submit" className="w-full" disabled={loading || googleLoading}>
           {loading ? 'Giriş yapılıyor…' : 'Giriş Yap'}
-        </Button>
-        <Button type="button" variant="secondary" className="w-full" onClick={google}>
-          Google ile devam et
         </Button>
 
         <div className="relative py-2">
@@ -92,6 +116,16 @@ export default function LoginForm() {
             <span className="bg-ivory px-3 text-muted">veya</span>
           </div>
         </div>
+
+        <Button
+          type="button"
+          variant="secondary"
+          className="w-full"
+          onClick={google}
+          disabled={googleLoading || loading}
+        >
+          {googleLoading ? 'Google’a yönlendiriliyor…' : 'Google ile devam et'}
+        </Button>
 
         <Button type="button" variant="secondary" className="w-full" onClick={continueAsGuest}>
           Müşteri olmadan devam et
