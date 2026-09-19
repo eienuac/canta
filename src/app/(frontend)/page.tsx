@@ -120,11 +120,7 @@ export default async function HomePage() {
 
         <div className="container-page relative flex min-h-[88vh] flex-col justify-end pb-20 pt-32 md:justify-center md:pb-24">
           <div className="mb-8">
-            <BrandLogo
-              href={null}
-              priority
-              className="h-14 brightness-0 invert md:h-16"
-            />
+            <BrandLogo href={null} priority variant="onDark" className="h-20 md:h-28" />
           </div>
           <p className="mb-6 font-display text-2xl tracking-[0.35em] text-taba md:text-3xl">1967</p>
           <h1 className="max-w-xl whitespace-pre-line font-display text-5xl leading-[1.05] md:text-7xl">

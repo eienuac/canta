@@ -60,7 +60,7 @@ export function SiteHeader({
             >
               <Menu className="h-5 w-5" strokeWidth={1.5} />
             </button>
-            <BrandLogo priority className="h-9 md:h-11" />
+            <BrandLogo priority className="h-10 md:h-12" />
           </div>
 
           <nav className="hidden items-center gap-7 md:flex">
