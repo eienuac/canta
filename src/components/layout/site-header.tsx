@@ -103,7 +103,7 @@ export function SiteHeader({
             {isAdmin && (
               <Link
                 href="/app-admin"
-                className="mr-1 hidden items-center gap-1.5 bg-espresso px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-ivory transition hover:bg-brown-deep sm:inline-flex"
+                className="mr-1 inline-flex items-center gap-1.5 bg-espresso px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-ivory transition hover:bg-brown-deep"
               >
                 <LayoutDashboard className="h-3.5 w-3.5" strokeWidth={1.75} />
                 Admin

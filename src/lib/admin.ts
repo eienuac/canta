@@ -1,6 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
+function parseAdminEmails() {
+  return (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+}
+
 export async function requireAppAdmin() {
   const supabase = await createClient()
   const {
@@ -8,22 +15,29 @@ export async function requireAppAdmin() {
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const adminEmails = (process.env.ADMIN_EMAILS || '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
+  const adminEmails = parseAdminEmails()
+  const email = user.email?.toLowerCase() || ''
 
-  const admin = getSupabaseAdmin()
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('role, email')
-    .eq('id', user.id)
-    .maybeSingle()
+  // Fast path: ADMIN_EMAILS — does not require service role key
+  if (email && adminEmails.includes(email)) {
+    return { user, profile: null }
+  }
 
-  const isAdmin =
-    profile?.role === 'admin' ||
-    (user.email && adminEmails.includes(user.email.toLowerCase()))
+  // Fallback: profiles.role = admin
+  try {
+    const admin = getSupabaseAdmin()
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('role, email')
+      .eq('id', user.id)
+      .maybeSingle()
 
-  if (!isAdmin) return null
-  return { user, profile }
+    if (profile?.role === 'admin') {
+      return { user, profile }
+    }
+  } catch (error) {
+    console.error('[requireAppAdmin] profile lookup failed:', error)
+  }
+
+  return null
 }
