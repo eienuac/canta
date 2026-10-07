@@ -1,7 +1,17 @@
 import type { CollectionConfig } from 'payload'
 
+function altFromFilename(filename: unknown) {
+  if (typeof filename !== 'string' || !filename) return null
+  const base = filename.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim()
+  return base || null
+}
+
 export const Media: CollectionConfig = {
   slug: 'media',
+  labels: {
+    singular: 'Görsel',
+    plural: 'Görseller',
+  },
   access: {
     read: () => true,
   },
@@ -20,10 +30,24 @@ export const Media: CollectionConfig = {
   },
   fields: [
     {
+      // DB column is NOT NULL — always filled from the filename when left empty.
       name: 'alt',
       type: 'text',
       label: 'Alt metin',
-      required: true,
+      admin: { hidden: true },
+      hooks: {
+        beforeValidate: [
+          ({ value, data, originalDoc, req }) => {
+            if (typeof value === 'string' && value.trim()) return value
+            return (
+              altFromFilename(data?.filename) ||
+              altFromFilename(originalDoc?.filename) ||
+              altFromFilename(req.file?.name) ||
+              'Görsel'
+            )
+          },
+        ],
+      },
     },
   ],
 }

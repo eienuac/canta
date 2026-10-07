@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url'
 import { buildConfig } from 'payload'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { tr } from '@payloadcms/translations/languages/tr'
 import sharp from 'sharp'
 
 import { Users } from './collections/Users'
@@ -88,11 +89,12 @@ export default buildConfig({
     push: false,
   }),
   sharp,
+  i18n: {
+    supportedLanguages: { tr },
+    fallbackLanguage: 'tr',
+  },
   localization: {
-    locales: [
-      { label: 'Türkçe', code: 'tr' },
-      { label: 'English', code: 'en' },
-    ],
+    locales: [{ label: 'Türkçe', code: 'tr' }],
     defaultLocale: 'tr',
     fallback: true,
   },

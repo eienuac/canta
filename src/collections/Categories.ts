@@ -1,7 +1,12 @@
 import type { CollectionConfig } from 'payload'
+import { slugField } from '@/fields/auto'
 
 export const Categories: CollectionConfig = {
   slug: 'categories',
+  labels: {
+    singular: 'Kategori',
+    plural: 'Kategoriler',
+  },
   admin: {
     useAsTitle: 'name',
     group: 'Katalog',
@@ -18,17 +23,7 @@ export const Categories: CollectionConfig = {
       required: true,
       localized: true,
     },
-    {
-      name: 'slug',
-      type: 'text',
-      label: 'Slug',
-      required: true,
-      unique: true,
-      index: true,
-      admin: {
-        position: 'sidebar',
-      },
-    },
+    slugField('name'),
     {
       name: 'description',
       type: 'textarea',
@@ -48,6 +43,7 @@ export const Categories: CollectionConfig = {
       label: 'Üst kategori',
       admin: {
         position: 'sidebar',
+        description: 'Alt kategori ise seçin, değilse boş bırakın.',
       },
     },
     {
@@ -62,7 +58,7 @@ export const Categories: CollectionConfig = {
     {
       name: 'showInHeader',
       type: 'checkbox',
-      label: 'Header menüsünde göster',
+      label: 'Üst menüde göster',
       defaultValue: true,
       admin: {
         position: 'sidebar',
@@ -72,10 +68,11 @@ export const Categories: CollectionConfig = {
       name: 'seo',
       type: 'group',
       label: 'SEO',
+      admin: { hidden: true },
       fields: [
-        { name: 'title', type: 'text', label: 'SEO başlığı', localized: true },
-        { name: 'description', type: 'textarea', label: 'Meta description', localized: true },
-        { name: 'ogImage', type: 'upload', relationTo: 'media', label: 'OG görseli' },
+        { name: 'title', type: 'text', localized: true },
+        { name: 'description', type: 'textarea', localized: true },
+        { name: 'ogImage', type: 'upload', relationTo: 'media' },
       ],
     },
   ],

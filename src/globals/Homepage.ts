@@ -3,6 +3,9 @@ import type { GlobalConfig } from 'payload'
 export const Homepage: GlobalConfig = {
   slug: 'homepage',
   label: 'Ana Sayfa',
+  admin: {
+    group: 'Site',
+  },
   access: {
     read: () => true,
   },
@@ -10,7 +13,7 @@ export const Homepage: GlobalConfig = {
     {
       name: 'hero',
       type: 'group',
-      label: 'Hero',
+      label: 'Giriş bölümü',
       fields: [
         {
           name: 'title',
@@ -30,12 +33,12 @@ export const Homepage: GlobalConfig = {
           name: 'image',
           type: 'upload',
           relationTo: 'media',
-          label: 'Hero görseli',
+          label: 'Arka plan görseli',
         },
         {
           name: 'primaryCta',
           type: 'group',
-          label: 'Birincil CTA',
+          label: 'Birinci buton',
           fields: [
             { name: 'label', type: 'text', label: 'Metin', defaultValue: 'Koleksiyonu Keşfet' },
             { name: 'href', type: 'text', label: 'Link', defaultValue: '/products' },
@@ -44,7 +47,7 @@ export const Homepage: GlobalConfig = {
         {
           name: 'secondaryCta',
           type: 'group',
-          label: 'İkincil CTA',
+          label: 'İkinci buton',
           fields: [
             { name: 'label', type: 'text', label: 'Metin', defaultValue: 'Yeni Gelenler' },
             { name: 'href', type: 'text', label: 'Link', defaultValue: '/products?sort=newest' },
@@ -63,6 +66,7 @@ export const Homepage: GlobalConfig = {
       name: 'banners',
       type: 'array',
       label: 'Promosyon bannerları',
+      admin: { hidden: true },
       fields: [
         { name: 'title', type: 'text', label: 'Başlık', localized: true },
         { name: 'description', type: 'textarea', label: 'Açıklama', localized: true },
@@ -110,7 +114,8 @@ export const Homepage: GlobalConfig = {
     {
       name: 'newsletter',
       type: 'group',
-      label: 'Newsletter',
+      label: 'Bülten',
+      admin: { hidden: true },
       fields: [
         {
           name: 'title',

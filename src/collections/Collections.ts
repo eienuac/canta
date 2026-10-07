@@ -1,7 +1,12 @@
 import type { CollectionConfig } from 'payload'
+import { slugField } from '@/fields/auto'
 
 export const Collections: CollectionConfig = {
   slug: 'collections',
+  labels: {
+    singular: 'Koleksiyon',
+    plural: 'Koleksiyonlar',
+  },
   admin: {
     useAsTitle: 'name',
     group: 'Katalog',
@@ -17,14 +22,7 @@ export const Collections: CollectionConfig = {
       required: true,
       localized: true,
     },
-    {
-      name: 'slug',
-      type: 'text',
-      label: 'Slug',
-      required: true,
-      unique: true,
-      index: true,
-    },
+    slugField('name'),
     {
       name: 'description',
       type: 'textarea',
@@ -47,9 +45,10 @@ export const Collections: CollectionConfig = {
       name: 'seo',
       type: 'group',
       label: 'SEO',
+      admin: { hidden: true },
       fields: [
-        { name: 'title', type: 'text', label: 'SEO başlığı', localized: true },
-        { name: 'description', type: 'textarea', label: 'Meta description', localized: true },
+        { name: 'title', type: 'text', localized: true },
+        { name: 'description', type: 'textarea', localized: true },
       ],
     },
   ],
