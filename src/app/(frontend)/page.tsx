@@ -143,14 +143,28 @@ export default async function HomePage() {
 
       <section className="container-page grid gap-8 py-20 md:grid-cols-2">
         <Link href="/products?gender=men" className="group relative min-h-[420px] overflow-hidden bg-brown-deep">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#3d6b5c,transparent_50%)] transition duration-700 group-hover:scale-105" />
+          <Image
+            src="/home/erkek.jpg"
+            alt="Erkek koleksiyonu"
+            fill
+            sizes="(min-width: 768px) 50vw, 100vw"
+            className="object-cover object-[center_55%] transition duration-700 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-espresso/80 via-espresso/20 to-transparent" />
           <div className="absolute inset-0 flex flex-col justify-end p-8 text-ivory">
             <p className="text-[11px] uppercase tracking-[0.2em] text-taba">Koleksiyon</p>
             <h2 className="mt-2 font-display text-4xl">Erkek</h2>
           </div>
         </Link>
         <Link href="/products?gender=women" className="group relative min-h-[420px] overflow-hidden bg-leather">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,#c5b48a55,transparent_55%)] transition duration-700 group-hover:scale-105" />
+          <Image
+            src="/home/kadin.jpg"
+            alt="Kadın koleksiyonu"
+            fill
+            sizes="(min-width: 768px) 50vw, 100vw"
+            className="object-cover object-[center_45%] transition duration-700 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-espresso/80 via-espresso/20 to-transparent" />
           <div className="absolute inset-0 flex flex-col justify-end p-8 text-ivory">
             <p className="text-[11px] uppercase tracking-[0.2em] text-sand">Koleksiyon</p>
             <h2 className="mt-2 font-display text-4xl">Kadın</h2>
