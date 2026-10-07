@@ -84,11 +84,6 @@ export const Products: CollectionConfig = {
               defaultValue: 'Seçkin Çanta',
               admin: { hidden: true },
             },
-          ],
-        },
-        {
-          label: 'Fiyat ve Stok',
-          fields: [
             {
               type: 'row',
               fields: [
@@ -121,6 +116,7 @@ export const Products: CollectionConfig = {
                   min: 0,
                   defaultValue: 0,
                   admin: {
+                    width: '50%',
                     description: 'Varyant eklediyseniz her varyantın kendi stoğu geçerlidir.',
                   },
                 },
@@ -128,68 +124,44 @@ export const Products: CollectionConfig = {
               ],
             },
             {
-              name: 'isActive',
-              type: 'checkbox',
-              label: 'Satışta',
-              defaultValue: true,
-            },
-            {
-              name: 'isFeatured',
-              type: 'checkbox',
-              label: 'Öne çıkan',
-              defaultValue: false,
-            },
-            {
-              name: 'isNew',
-              type: 'checkbox',
-              label: 'Yeni gelen',
-              defaultValue: false,
-            },
-            {
-              name: 'isBestSeller',
-              type: 'checkbox',
-              label: 'Çok satan',
-              defaultValue: false,
-            },
-          ],
-        },
-        {
-          label: 'Kategori',
-          fields: [
-            {
-              name: 'category',
-              type: 'relationship',
-              relationTo: 'categories',
-              label: 'Kategori',
-              required: true,
-            },
-            {
-              name: 'subCategory',
-              type: 'relationship',
-              relationTo: 'categories',
-              label: 'Alt kategori',
-            },
-            {
-              name: 'gender',
-              type: 'select',
-              label: 'Cinsiyet',
-              options: [
-                { label: 'Erkek', value: 'men' },
-                { label: 'Kadın', value: 'women' },
-                { label: 'Unisex', value: 'unisex' },
+              type: 'row',
+              fields: [
+                {
+                  name: 'category',
+                  type: 'relationship',
+                  relationTo: 'categories',
+                  label: 'Kategori',
+                  required: true,
+                },
+                {
+                  name: 'subCategory',
+                  type: 'relationship',
+                  relationTo: 'categories',
+                  label: 'Alt kategori',
+                },
               ],
             },
             {
-              name: 'collection',
-              type: 'relationship',
-              relationTo: 'collections',
-              label: 'Koleksiyon',
+              type: 'row',
+              fields: [
+                {
+                  name: 'gender',
+                  type: 'select',
+                  label: 'Cinsiyet',
+                  options: [
+                    { label: 'Erkek', value: 'men' },
+                    { label: 'Kadın', value: 'women' },
+                    { label: 'Unisex', value: 'unisex' },
+                  ],
+                },
+                {
+                  name: 'collection',
+                  type: 'relationship',
+                  relationTo: 'collections',
+                  label: 'Koleksiyon',
+                },
+              ],
             },
-          ],
-        },
-        {
-          label: 'Fotoğraflar',
-          fields: [
             {
               name: 'images',
               type: 'array',
@@ -220,6 +192,35 @@ export const Products: CollectionConfig = {
                   name: 'isPrimary',
                   type: 'checkbox',
                   label: 'Ana fotoğraf',
+                  defaultValue: false,
+                },
+              ],
+            },
+            {
+              type: 'row',
+              fields: [
+                {
+                  name: 'isActive',
+                  type: 'checkbox',
+                  label: 'Satışta',
+                  defaultValue: true,
+                },
+                {
+                  name: 'isFeatured',
+                  type: 'checkbox',
+                  label: 'Öne çıkan',
+                  defaultValue: false,
+                },
+                {
+                  name: 'isNew',
+                  type: 'checkbox',
+                  label: 'Yeni gelen',
+                  defaultValue: false,
+                },
+                {
+                  name: 'isBestSeller',
+                  type: 'checkbox',
+                  label: 'Çok satan',
                   defaultValue: false,
                 },
               ],

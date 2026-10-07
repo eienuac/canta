@@ -46,6 +46,7 @@ export function productSkuField(): Field {
     unique: true,
     index: true,
     admin: {
+      width: '50%',
       description: 'Boş bırakırsanız otomatik oluşturulur. Kaydettikten sonra değiştirmeyin.',
     },
     hooks: {
