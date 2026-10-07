@@ -88,9 +88,6 @@ export default async function HomePage() {
   }
 
   const hero = homepage?.hero
-  const title = hero?.title || 'Zamansız Deri.\nGünlük Hayatın İçin Tasarlandı.'
-  const subtitle =
-    hero?.subtitle || 'Çantalardan cüzdanlara, gerçek deri ve zamansız tasarım.'
 
   return (
     <div>
@@ -118,11 +115,9 @@ export default async function HomePage() {
         </div>
 
         <div className="container-page relative flex min-h-[88vh] flex-col justify-end pb-20 pt-32 md:justify-center md:pb-24">
-          <p className="mb-6 font-display text-3xl tracking-[0.4em] text-taba md:text-4xl">1967</p>
-          <h1 className="max-w-xl whitespace-pre-line font-display text-5xl leading-[1.05] md:text-7xl">
-            {title}
+          <h1 className="font-display text-7xl tracking-[0.3em] text-taba md:text-9xl">
+            <span className="sr-only">Seçkin Çanta </span>1967
           </h1>
-          <p className="mt-6 max-w-md text-base text-ivory/80 md:text-lg">{subtitle}</p>
           <div className="mt-10 flex flex-wrap gap-3">
             <Link href={hero?.primaryCta?.href || '/products'}>
               <Button className="bg-ivory text-espresso hover:bg-sand">

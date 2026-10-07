@@ -20,6 +20,7 @@ export const Homepage: GlobalConfig = {
           type: 'text',
           label: 'Başlık',
           localized: true,
+          admin: { hidden: true },
           defaultValue: 'Zamansız Deri.\nGünlük Hayatın İçin Tasarlandı.',
         },
         {
@@ -27,6 +28,7 @@ export const Homepage: GlobalConfig = {
           type: 'textarea',
           label: 'Alt metin',
           localized: true,
+          admin: { hidden: true },
           defaultValue: 'Çantalardan cüzdanlara, gerçek deri ve zamansız tasarım.',
         },
         {
