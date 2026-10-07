@@ -52,7 +52,13 @@ export function ProductPurchasePanel({ product }: { product: ProductDetailDTO })
 
       {product.variants.length > 1 && (
         <div className="mt-8">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted">Varyant</p>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+            {product.variants.every((v) => v.color && !v.size)
+              ? 'Renk'
+              : product.variants.every((v) => v.size && !v.color)
+                ? 'Boyut'
+                : 'Seçenek'}
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {product.variants.map((v) => (
               <button
