@@ -116,6 +116,8 @@ export const Products: CollectionConfig = {
                   required: true,
                   min: 0,
                   defaultValue: 0,
+                  // Exact stock counts are internal; the storefront reads them server-side.
+                  access: { read: ({ req }) => Boolean(req.user) },
                   admin: {
                     width: '50%',
                     description: 'Varyant eklediyseniz her varyantın kendi stoğu geçerlidir.',
@@ -333,6 +335,7 @@ export const Products: CollectionConfig = {
                       required: true,
                       min: 0,
                       defaultValue: 0,
+                      access: { read: ({ req }) => Boolean(req.user) },
                     },
                   ],
                 },

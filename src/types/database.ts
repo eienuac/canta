@@ -202,9 +202,18 @@ export type Database = {
         idempotency_key: string
         created_at: string
       }>
+      rate_limits: TableDef<{
+        key: string
+        count: number
+        reset_at: string
+      }>
     }
     Views: Record<string, never>
     Functions: {
+      rate_limit_hit: {
+        Args: { p_key: string; p_limit: number; p_window_seconds: number }
+        Returns: boolean
+      }
       reserve_inventory: {
         Args: { p_sku: string; p_qty: number; p_idempotency_key: string }
         Returns: boolean

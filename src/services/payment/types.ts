@@ -42,6 +42,7 @@ export type WebhookVerificationResult = {
   token?: string
   status?: 'paid' | 'failed' | 'pending'
   amount?: number
+  currency?: string
   raw?: unknown
 }
 

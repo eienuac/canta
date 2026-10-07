@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { checkoutSchema, createCheckoutSession } from '@/services/orders'
-import { headers } from 'next/headers'
-import { rateLimit } from '@/lib/rate-limit'
+import { rateLimit, clientIp } from '@/lib/rate-limit'
 import { getErrorMessage } from '@/lib/errors'
 import type { Database } from '@/types/database'
 import type { User } from '@supabase/supabase-js'
@@ -31,9 +30,8 @@ async function resolveUser(request: Request): Promise<User | null> {
 
 export async function POST(request: Request) {
   try {
-    const h = await headers()
-    const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || '127.0.0.1'
-    if (!rateLimit(`checkout:${ip}`, 10, 60_000)) {
+    const ip = await clientIp()
+    if (!(await rateLimit(`checkout:${ip}`, 10, 60_000))) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
     }
 
@@ -62,7 +60,7 @@ export async function POST(request: Request) {
     })
   } catch (e) {
     const message = getErrorMessage(e, 'Checkout failed')
-    console.error('[POST /api/checkout]', message, e)
+    console.error('[POST /api/checkout]', message)
     const status = message.toLowerCase().includes('configured') ? 503 : 400
     return NextResponse.json({ error: message }, { status })
   }

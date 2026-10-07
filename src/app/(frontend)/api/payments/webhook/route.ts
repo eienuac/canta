@@ -1,48 +1,64 @@
 import { NextResponse } from 'next/server'
 import { getPaymentProvider } from '@/services/payment'
-import { finalizePaidOrder, markOrderPaymentFailed } from '@/services/orders'
-import { createHash } from 'crypto'
+import {
+  finalizePaidOrder,
+  markOrderPaymentFailed,
+  resolveOrderIdFromPaymentResult,
+} from '@/services/orders'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
   const body = await request.text()
-  const provider = getPaymentProvider()
-  const verified = await provider.verifyWebhook(request.headers, body)
-
-  if (!verified.valid || !verified.orderId) {
+  let verified: Awaited<ReturnType<ReturnType<typeof getPaymentProvider>['verifyWebhook']>>
+  try {
+    verified = await getPaymentProvider().verifyWebhook(request.headers, body)
+  } catch (e) {
+    console.error('[payments/webhook] verify failed', e instanceof Error ? e.message : 'unknown')
     return NextResponse.json({ error: 'Invalid webhook' }, { status: 401 })
   }
 
-  const webhookIdempotencyKey = createHash('sha256')
-    .update(`${verified.providerPaymentId || ''}:${verified.orderId}:${verified.status || 'unknown'}`)
-    .digest('hex')
+  if (!verified.valid) {
+    return NextResponse.json({ error: 'Invalid webhook' }, { status: 401 })
+  }
+
+  const orderId =
+    verified.orderId ||
+    (await resolveOrderIdFromPaymentResult({
+      basketId: verified.basketId,
+      token: verified.token,
+      providerPaymentId: verified.providerPaymentId,
+    }))
+  if (!orderId) {
+    return NextResponse.json({ error: 'Invalid webhook' }, { status: 401 })
+  }
 
   try {
     if (verified.status === 'paid') {
       const result = await finalizePaidOrder({
-        orderId: verified.orderId,
+        orderId,
+        token: verified.token,
         providerPaymentId: verified.providerPaymentId,
         amount: verified.amount,
+        currency: verified.currency,
         raw: verified.raw,
-        webhookIdempotencyKey,
       })
       return NextResponse.json(result)
     }
 
     if (verified.status === 'failed') {
       const result = await markOrderPaymentFailed({
-        orderId: verified.orderId,
+        orderId,
         providerPaymentId: verified.providerPaymentId,
         raw: verified.raw,
-        webhookIdempotencyKey,
       })
       return NextResponse.json(result)
     }
 
     return NextResponse.json({ ok: true, ignored: true })
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Finalize failed' },
-      { status: 500 }
-    )
+    console.error('[payments/webhook] failed', e instanceof Error ? e.message : 'unknown')
+    return NextResponse.json({ error: 'Finalize failed' }, { status: 500 })
   }
 }

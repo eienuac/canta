@@ -85,7 +85,12 @@ export default buildConfig({
   collections: [Users, Media, Categories, Collections, Products, Pages],
   globals: [Homepage, SiteSettings],
   editor: lexicalEditor(),
-  secret: process.env.PAYLOAD_SECRET || 'dev-secret-change-me',
+  // A guessable fallback would let anyone forge admin JWTs — only allow it outside production.
+  secret:
+    process.env.PAYLOAD_SECRET ||
+    (process.env.NODE_ENV === 'production' ? '' : 'dev-secret-change-me'),
+  // The storefront never uses GraphQL; leaving it on only widens the attack surface.
+  graphQL: { disable: true },
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { timingSafeEqual } from 'crypto'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { getAvailableStock, syncProductInventory } from '@/services/inventory/sync'
 import { getPayloadClient } from '@/lib/payload'
@@ -28,6 +29,59 @@ export type CartLine = {
   inStock: boolean
   stockStatus: 'ok' | 'insufficient' | 'out_of_stock'
   lineTotal: number
+}
+
+function safeEqual(a: string, b: string) {
+  const ba = Buffer.from(a)
+  const bb = Buffer.from(b)
+  return ba.length === bb.length && timingSafeEqual(ba, bb)
+}
+
+/**
+ * Throws unless the caller owns the cart: a signed-in user must match carts.user_id,
+ * a guest must present the cart's guest token. Returns the cart row.
+ */
+export async function assertCartAccess(
+  cartId: string,
+  userId?: string | null,
+  guestToken?: string | null
+) {
+  const supabase = getSupabaseAdmin()
+  const { data: cart, error } = await supabase
+    .from('carts')
+    .select('*')
+    .eq('id', cartId)
+    .maybeSingle()
+  if (error) throw error
+  if (!cart) throw new Error('Sepet bulunamadı')
+
+  if (userId) {
+    if (cart.user_id !== userId) throw new Error('Bu sepet size ait değil')
+    return cart
+  }
+
+  if (!guestToken || !cart.guest_token || !safeEqual(cart.guest_token, guestToken)) {
+    throw new Error('Misafir sepet doğrulanamadı')
+  }
+  return cart
+}
+
+/** Same check, starting from a cart item id. Returns the item row. */
+export async function assertCartItemAccess(
+  itemId: string,
+  userId?: string | null,
+  guestToken?: string | null
+) {
+  const supabase = getSupabaseAdmin()
+  const { data: item, error } = await supabase
+    .from('cart_items')
+    .select('*')
+    .eq('id', itemId)
+    .maybeSingle()
+  if (error) throw error
+  if (!item) throw new Error('Sepet kalemi bulunamadı')
+  await assertCartAccess(item.cart_id, userId, guestToken)
+  return item
 }
 
 export async function getOrCreateUserCart(userId: string) {

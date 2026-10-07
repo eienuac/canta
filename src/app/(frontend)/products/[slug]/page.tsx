@@ -10,6 +10,14 @@ import { absoluteUrl } from '@/lib/utils'
 
 type Props = { params: Promise<{ slug: string }> }
 
+/** JSON-LD is injected as raw HTML: escape `<` (and line separators) so product text can never close the script tag. */
+function safeJsonLd(data: unknown) {
+  return JSON.stringify(data)
+    .replace(/</g, '\\u003c')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   try {
@@ -91,10 +99,10 @@ export default async function ProductDetailPage({ params }: Props) {
 
   return (
     <div className="container-page py-10 md:py-14">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbLd) }}
       />
 
       <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">

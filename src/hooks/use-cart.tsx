@@ -311,7 +311,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         method: 'PATCH',
         credentials: 'include',
         headers: await authHeaders(),
-        body: JSON.stringify({ itemId, quantity }),
+        body: JSON.stringify({ itemId, quantity, guestToken: peekGuestToken() || undefined }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Güncellenemedi')
@@ -330,7 +330,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         method: 'DELETE',
         credentials: 'include',
         headers: await authHeaders(),
-        body: JSON.stringify({ itemId }),
+        body: JSON.stringify({ itemId, guestToken: peekGuestToken() || undefined }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Silinemedi')
@@ -349,7 +349,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         credentials: 'include',
         headers: await authHeaders(),
-        body: JSON.stringify({ code, cartId: state.cartId }),
+        body: JSON.stringify({
+          code,
+          cartId: state.cartId,
+          guestToken: peekGuestToken() || undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Kupon uygulanamadı')

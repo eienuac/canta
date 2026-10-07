@@ -1,28 +1,52 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
-import { getCartWithProducts } from '@/services/cart'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { assertCartAccess, getCartWithProducts } from '@/services/cart'
 import { validateCoupon } from '@/services/coupons'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
-import { rateLimit } from '@/lib/rate-limit'
+import { rateLimit, clientIp } from '@/lib/rate-limit'
+import type { Database } from '@/types/database'
+import type { User } from '@supabase/supabase-js'
+
+async function resolveUser(request: Request): Promise<User | null> {
+  const authHeader = request.headers.get('authorization')
+  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null
+  if (bearer) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (url && anon) {
+      const client = createSupabaseClient<Database>(url, anon, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+      const { data } = await client.auth.getUser(bearer)
+      if (data.user) return data.user
+    }
+  }
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  return user
+}
 
 export async function POST(request: Request) {
   try {
-    const h = await headers()
-    const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || '127.0.0.1'
-    if (!rateLimit(`coupon:${ip}`, 15, 60_000)) {
-      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    // Tight limit: this endpoint is the only way to brute-force coupon codes.
+    if (!(await rateLimit(`coupon:${await clientIp()}`, 10, 60_000))) {
+      return NextResponse.json({ error: 'Çok fazla deneme. Lütfen biraz bekleyin.' }, { status: 429 })
     }
 
     const body = z
-      .object({ code: z.string(), cartId: z.string().uuid() })
+      .object({
+        code: z.string().max(40),
+        cartId: z.string().uuid(),
+        guestToken: z.string().min(8).optional(),
+      })
       .parse(await request.json())
 
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await resolveUser(request)
+    await assertCartAccess(body.cartId, user?.id, body.guestToken)
 
     const cart = await getCartWithProducts(body.cartId)
     const result = await validateCoupon({

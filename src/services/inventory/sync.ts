@@ -304,3 +304,64 @@ export async function releaseStock(sku: string, qty: number, idempotencyKey: str
   if (ledErr && !/duplicate|unique/i.test(ledErr.message)) throw ledErr
   return true
 }
+
+/**
+ * Decrement the CMS stock (source of truth for storefront availability) after a
+ * paid sale. Without this, inventory.quantity is reset from the CMS on the next
+ * product save and sold units reappear.
+ * Callers must guarantee single execution per order (paid claim).
+ */
+export async function decrementCmsStock(sku: string, qty: number): Promise<boolean> {
+  try {
+    const { getPayloadClient } = await import('@/lib/payload')
+    const payload = await getPayloadClient()
+
+    const byVariant = await payload.find({
+      collection: 'products',
+      where: { 'variants.sku': { equals: sku } },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+      locale: 'tr',
+    })
+    const variantProduct = byVariant.docs[0] as Product | undefined
+    if (variantProduct?.variants?.some((v) => v.sku === sku)) {
+      const variants = variantProduct.variants.map((v) =>
+        v.sku === sku ? { ...v, stock: Math.max(0, normalizeStock(v.stock) - qty) } : v
+      )
+      await payload.update({
+        collection: 'products',
+        id: variantProduct.id,
+        data: { variants },
+        depth: 0,
+        overrideAccess: true,
+        locale: 'tr',
+      })
+      return true
+    }
+
+    const bySku = await payload.find({
+      collection: 'products',
+      where: { sku: { equals: sku } },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+      locale: 'tr',
+    })
+    const product = bySku.docs[0] as Product | undefined
+    if (product) {
+      await payload.update({
+        collection: 'products',
+        id: product.id,
+        data: { stock: Math.max(0, normalizeStock(product.stock) - qty) },
+        depth: 0,
+        overrideAccess: true,
+        locale: 'tr',
+      })
+      return true
+    }
+  } catch (err) {
+    console.error('[decrementCmsStock]', sku, err instanceof Error ? err.message : 'unknown')
+  }
+  return false
+}

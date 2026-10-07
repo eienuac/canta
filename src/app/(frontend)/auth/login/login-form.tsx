@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { mergeGuestCartAfterAuth } from '@/hooks/use-cart'
+import { safeRedirectPath } from '@/lib/utils'
 
 function safeNextPath(raw: string | null): string {
-  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/products'
-  return raw
+  return safeRedirectPath(raw, '/products')
 }
 
 export default function LoginForm() {

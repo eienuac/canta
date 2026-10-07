@@ -20,7 +20,8 @@ export const Media: CollectionConfig = {
   },
   upload: {
     staticDir: 'media',
-    mimeTypes: ['image/*'],
+    // Explicit list: `image/*` would also allow SVG (script-capable) uploads.
+    mimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'],
     imageSizes: [
       { name: 'thumbnail', width: 300, height: 300, position: 'centre' },
       { name: 'card', width: 800, height: 1000, position: 'centre' },

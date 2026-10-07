@@ -126,7 +126,7 @@ export class IyzicoPaymentProvider implements PaymentProvider {
   }
 
   async createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
-    const { baseUrl, apiKey, secretKey } = this.credentials
+    const { baseUrl } = this.credentials
     const path = '/payment/iyzipos/checkoutform/initialize/auth/ecom'
 
     const basketItems = input.basketItems
@@ -181,19 +181,12 @@ export class IyzicoPaymentProvider implements PaymentProvider {
     }
 
     const body = JSON.stringify(payload)
-    const { headers, debug } = this.buildAuth(path, body)
+    const { headers } = this.buildAuth(path, body)
 
     console.info('[iyzico.createPayment] request', {
-      baseUrl,
-      apiKeyPreview: `${apiKey.slice(0, 14)}…`,
-      secretKeyLength: secretKey.length,
-      secretKeyPrefix: secretKey.startsWith('sandbox-') ? 'sandbox-' : 'live?',
-      signatureEncoding: 'hex',
-      ...debug,
-      paidPrice,
+      env: baseUrl.includes('sandbox') ? 'sandbox' : 'live',
+      conversationId: input.orderId,
       basketCount: basketItems.length,
-      callbackUrl: input.callbackUrl,
-      buyerPhone: payload.buyer.gsmNumber,
     })
 
     const res = await fetch(`${baseUrl}${path}`, {
@@ -209,14 +202,7 @@ export class IyzicoPaymentProvider implements PaymentProvider {
         status: raw.status,
         errorCode: raw.errorCode,
         errorMessage: raw.errorMessage,
-        locale: raw.locale,
-        systemTime: raw.systemTime,
         conversationId: raw.conversationId,
-        authScheme: 'IYZWSv2',
-        signatureEncoding: 'hex',
-        apiKeyPreview: `${apiKey.slice(0, 14)}…`,
-        secretKeyLength: secretKey.length,
-        ...debug,
       })
       throw new Error(raw.errorMessage || raw.errorCode || 'iyzico payment init failed')
     }
@@ -254,12 +240,7 @@ export class IyzicoPaymentProvider implements PaymentProvider {
           apiStatus: retrieved.status,
           paymentStatus: retrieved.paymentStatus,
           errorCode: retrieved.errorCode,
-          errorMessage: retrieved.errorMessage,
           conversationId: retrieved.conversationId,
-          paymentId: retrieved.paymentId,
-          paidPrice: retrieved.paidPrice,
-          mdStatus: retrieved.mdStatus,
-          fraudStatus: retrieved.fraudStatus,
         })
 
         const conversationId = retrieved.conversationId
@@ -287,17 +268,21 @@ export class IyzicoPaymentProvider implements PaymentProvider {
           token: token || undefined,
           status: paid ? 'paid' : failed ? 'failed' : 'pending',
           amount: retrieved.paidPrice != null ? Number(retrieved.paidPrice) : undefined,
+          currency: retrieved.currency ? String(retrieved.currency) : undefined,
           raw: retrieved,
         }
       }
     } catch (err) {
-      console.error('[iyzico.verifyWebhook] token retrieve failed', err)
+      console.error(
+        '[iyzico.verifyWebhook] token retrieve failed',
+        err instanceof Error ? err.message : 'unknown'
+      )
       return { valid: false }
     }
 
     const secret = process.env.PAYMENT_WEBHOOK_SECRET?.trim() || process.env.PAYMENT_SECRET_KEY?.trim()
     if (!secret || !signature) {
-      console.warn('[iyzico.verifyWebhook] missing secret or signature for signed webhook')
+      console.warn('[iyzico.verifyWebhook] missing secret or signature')
       return { valid: false }
     }
 
@@ -340,7 +325,10 @@ export class IyzicoPaymentProvider implements PaymentProvider {
     })
     const raw = await res.json().catch(() => ({}))
     if (!res.ok) {
-      console.error('[iyzico.retrieveCheckoutForm] http error', { httpStatus: res.status, raw })
+      console.error('[iyzico.retrieveCheckoutForm] http error', {
+        httpStatus: res.status,
+        errorCode: raw?.errorCode,
+      })
     }
     return raw
   }

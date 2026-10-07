@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createReview, listApprovedReviews } from '@/services/reviews'
 import { getErrorMessage } from '@/lib/errors'
-import { rateLimit } from '@/lib/rate-limit'
+import { rateLimit, clientIp } from '@/lib/rate-limit'
 
 export async function GET(request: Request) {
   const productId = new URL(request.url).searchParams.get('productId')
@@ -21,9 +20,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const h = await headers()
-    const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || '127.0.0.1'
-    if (!rateLimit(`reviews:${ip}`, 20, 60_000)) {
+    if (!(await rateLimit(`reviews:${await clientIp()}`, 10, 60_000))) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
     }
 

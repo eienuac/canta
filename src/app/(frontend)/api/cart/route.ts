@@ -10,7 +10,9 @@ import {
   removeCartItem,
   updateCartItemQuantity,
   cartItemInputSchema,
+  assertCartItemAccess,
 } from '@/services/cart'
+import { rateLimit, clientIp } from '@/lib/rate-limit'
 import { getErrorMessage } from '@/lib/errors'
 import { z } from 'zod'
 import type { User } from '@supabase/supabase-js'
@@ -72,6 +74,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    if (!(await rateLimit(`cart-add:${await clientIp()}`, 60, 60_000))) {
+      return NextResponse.json({ error: 'Çok fazla istek. Lütfen biraz bekleyin.' }, { status: 429 })
+    }
     const body = await request.json()
     const input = cartItemInputSchema.parse(body)
     const cart = await resolveCart(request, body.guestToken)
@@ -88,14 +93,16 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = z
-      .object({ itemId: z.string().uuid(), quantity: z.number().int() })
+      .object({
+        itemId: z.string().uuid(),
+        quantity: z.number().int().max(20),
+        guestToken: z.string().min(8).optional(),
+      })
       .parse(await request.json())
+    const user = await resolveUser(request)
+    const owned = await assertCartItemAccess(body.itemId, user?.id, body.guestToken)
     const item = await updateCartItemQuantity(body.itemId, body.quantity)
-    const cartId = item?.cart_id
-    if (!cartId) {
-      return NextResponse.json({ item: null, items: [], itemCount: 0, subtotal: 0 })
-    }
-    const data = await getCartWithProducts(cartId)
+    const data = await getCartWithProducts(owned.cart_id)
     return NextResponse.json({ item, ...data })
   } catch (e) {
     const message = getErrorMessage(e, 'Güncellenemedi')
@@ -106,21 +113,15 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const body = z.object({ itemId: z.string().uuid() }).parse(await request.json())
-    // Load cart id before delete for refreshed snapshot
-    const { getSupabaseAdmin } = await import('@/lib/supabase/admin')
-    const admin = getSupabaseAdmin()
-    const { data: existing } = await admin
-      .from('cart_items')
-      .select('cart_id')
-      .eq('id', body.itemId)
-      .maybeSingle()
+    const body = z
+      .object({ itemId: z.string().uuid(), guestToken: z.string().min(8).optional() })
+      .parse(await request.json())
+    const user = await resolveUser(request)
+    // Ownership check also yields the cart id for the refreshed snapshot
+    const existing = await assertCartItemAccess(body.itemId, user?.id, body.guestToken)
 
     await removeCartItem(body.itemId)
 
-    if (!existing?.cart_id) {
-      return NextResponse.json({ ok: true, items: [], itemCount: 0, subtotal: 0 })
-    }
     const data = await getCartWithProducts(existing.cart_id)
     return NextResponse.json({ ok: true, ...data })
   } catch (e) {

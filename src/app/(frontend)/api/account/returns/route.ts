@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createReturnRequest } from '@/services/returns'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
+import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
 
 export async function GET() {
   const supabase = await createClient()
@@ -28,13 +30,20 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    if (!(await rateLimit(`returns:${user.id}`, 5, 60_000))) {
+      return NextResponse.json({ error: 'Çok fazla istek' }, { status: 429 })
+    }
+
     const body = await request.json()
     const result = await createReturnRequest({ ...body, userId: user.id })
     return NextResponse.json({ return: result })
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Failed' },
-      { status: 400 }
-    )
+    const message =
+      e instanceof z.ZodError
+        ? e.issues[0]?.message || 'Geçersiz istek'
+        : e instanceof Error
+          ? e.message
+          : 'Failed'
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 }

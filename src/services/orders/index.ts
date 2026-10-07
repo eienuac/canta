@@ -1,9 +1,14 @@
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
-import { getCartWithProducts } from '@/services/cart'
+import { assertCartAccess, getCartWithProducts } from '@/services/cart'
 import { validateCoupon } from '@/services/coupons'
-import { commitStock, releaseStock, reserveStock } from '@/services/inventory/sync'
+import {
+  commitStock,
+  decrementCmsStock,
+  releaseStock,
+  reserveStock,
+} from '@/services/inventory/sync'
 import { calculateShipping } from '@/services/shipping'
 import { getPaymentProvider } from '@/services/payment'
 import { absoluteUrl } from '@/lib/utils'
@@ -39,27 +44,6 @@ function generateOrderNumber() {
   return `SC${y}${m}${d}${nanoid(6).toUpperCase()}`
 }
 
-async function assertCartAccess(
-  cartId: string,
-  userId?: string | null,
-  guestToken?: string | null
-) {
-  const supabase = getSupabaseAdmin()
-  const { data: cart, error } = await supabase.from('carts').select('*').eq('id', cartId).maybeSingle()
-  if (error) throw error
-  if (!cart) throw new Error('Sepet bulunamadı')
-
-  if (userId) {
-    if (cart.user_id !== userId) throw new Error('Bu sepet size ait değil')
-    return cart
-  }
-
-  if (!guestToken || cart.guest_token !== guestToken) {
-    throw new Error('Misafir sepet doğrulanamadı')
-  }
-  return cart
-}
-
 async function releaseReservations(
   items: Array<{ sku: string; quantity: number }>,
   idempotencyKey: string
@@ -83,12 +67,21 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
   const data = checkoutSchema.parse(input)
   const supabase = getSupabaseAdmin()
 
+  // Ownership first — also protects the idempotent-replay branch below.
+  await assertCartAccess(data.cartId, data.userId, data.guestToken)
+
+  // Opportunistically free stock held by abandoned checkouts.
+  await releaseExpiredPendingOrders(20).catch(() => 0)
+
   const { data: existing } = await supabase
     .from('orders')
     .select('*')
     .eq('idempotency_key', data.idempotencyKey)
     .maybeSingle()
   if (existing) {
+    if (existing.cart_id !== data.cartId) {
+      throw new Error('Geçersiz sipariş isteği')
+    }
     if (existing.payment_status === 'paid') {
       return { order: existing, payment: null, reused: true as const }
     }
@@ -132,12 +125,24 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
         ],
         callbackUrl: absoluteUrl('/api/payments/callback'),
       })
+      // Keep the stored checkout token in sync with the newest initialize call
+      if (paymentInit.providerPaymentId) {
+        await supabase
+          .from('payments')
+          .update({
+            provider_payment_id: paymentInit.providerPaymentId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('order_id', existing.id)
+          .eq('status', 'pending')
+      }
       return { order: existing, payment: paymentInit, reused: true as const }
     }
     return { order: existing, payment: null, reused: true as const }
   }
 
-  await assertCartAccess(data.cartId, data.userId, data.guestToken)
+  // A new attempt replaces any earlier unpaid attempt for this cart (frees its reservation).
+  await cancelPendingOrdersForCart(data.cartId)
 
   const cart = await getCartWithProducts(data.cartId)
   if (!cart.items.length) {
@@ -153,6 +158,8 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
   }
 
   const reserved: Array<{ sku: string; quantity: number }> = []
+  let createdOrderId: string | null = null
+  let itemsInserted = false
   try {
     for (const item of cart.items) {
       const ok = await reserveStock(
@@ -196,7 +203,7 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
       .insert({
         order_number: orderNumber,
         user_id: data.userId ?? null,
-        guest_email: data.userId ? null : data.address.email,
+        guest_email: data.userId ? null : data.address.email.trim().toLowerCase(),
         status: 'pending_payment',
         payment_status: 'pending',
         subtotal: cart.subtotal,
@@ -216,6 +223,7 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
       .single()
 
     if (error || !order) throw error || new Error('Sipariş oluşturulamadı')
+    createdOrderId = order.id
 
     const orderItems = cart.items.map((item) => ({
       order_id: order.id,
@@ -230,6 +238,7 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
 
     const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
     if (itemsError) throw itemsError
+    itemsInserted = true
 
     const provider = getPaymentProvider()
     const paymentInit = await provider.createPayment({
@@ -269,7 +278,7 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
       callbackUrl: absoluteUrl('/api/payments/callback'),
     })
 
-    await supabase.from('payments').insert({
+    const { error: paymentInsertError } = await supabase.from('payments').insert({
       order_id: order.id,
       provider: provider.name,
       provider_payment_id: paymentInit.providerPaymentId ?? null,
@@ -279,13 +288,106 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
       raw_response: (paymentInit.raw as import('@/types/database').Json) ?? null,
       idempotency_key: `${data.idempotencyKey}:payment`,
     })
+    if (paymentInsertError) throw paymentInsertError
 
     return { order, payment: paymentInit, reused: false as const }
   } catch (err) {
-    if (reserved.length) {
+    if (createdOrderId && itemsInserted) {
+      // Order row + items exist → cancelPendingOrder releases reservations exactly once.
+      const done = await cancelPendingOrder(createdOrderId).catch(() => false)
+      if (!done && reserved.length) {
+        await releaseReservations(reserved, data.idempotencyKey)
+      }
+    } else if (reserved.length) {
+      if (createdOrderId) {
+        await supabase
+          .from('orders')
+          .update({ status: 'cancelled', payment_status: 'failed' })
+          .eq('id', createdOrderId)
+          .eq('payment_status', 'pending')
+      }
       await releaseReservations(reserved, data.idempotencyKey)
     }
     throw err
+  }
+}
+
+const PENDING_ORDER_TTL_MS = 30 * 60 * 1000
+
+type OrderRow = import('@/types/database').Database['public']['Tables']['orders']['Row']
+
+function appendNote(existing: string | null | undefined, note: string) {
+  return existing ? `${existing};${note}` : note
+}
+
+/**
+ * Atomically moves a still-pending order to cancelled/failed and releases its stock
+ * reservation exactly once. Returns false if somebody else already moved it
+ * (paid / cancelled), so callers never double-release.
+ */
+export async function cancelPendingOrder(orderId: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin()
+  const { data: claimed } = await supabase
+    .from('orders')
+    .update({
+      status: 'cancelled',
+      payment_status: 'failed',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', orderId)
+    .eq('payment_status', 'pending')
+    .select('id')
+    .maybeSingle()
+  if (!claimed) return false
+
+  const { data: items } = await supabase.from('order_items').select('*').eq('order_id', orderId)
+  for (const item of items ?? []) {
+    await releaseStock(
+      item.product_sku_snapshot,
+      item.quantity,
+      `cancel:${orderId}:release:${item.product_sku_snapshot}`
+    ).catch((err) => {
+      console.error('[cancelPendingOrder] release failed', item.product_sku_snapshot, err)
+    })
+  }
+
+  await supabase
+    .from('payments')
+    .update({ status: 'failed', updated_at: new Date().toISOString() })
+    .eq('order_id', orderId)
+    .eq('status', 'pending')
+
+  return true
+}
+
+/**
+ * Frees stock held by abandoned checkouts. Safe to call often; also wired to a daily cron.
+ */
+export async function releaseExpiredPendingOrders(limit = 50): Promise<number> {
+  const supabase = getSupabaseAdmin()
+  const cutoff = new Date(Date.now() - PENDING_ORDER_TTL_MS).toISOString()
+  const { data } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('payment_status', 'pending')
+    .lt('created_at', cutoff)
+    .limit(limit)
+  let released = 0
+  for (const row of data ?? []) {
+    if (await cancelPendingOrder(row.id)) released++
+  }
+  return released
+}
+
+async function cancelPendingOrdersForCart(cartId: string) {
+  const supabase = getSupabaseAdmin()
+  const { data } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('cart_id', cartId)
+    .eq('payment_status', 'pending')
+  for (const row of data ?? []) {
+    await cancelPendingOrder(row.id)
   }
 }
 
@@ -293,7 +395,7 @@ export async function markOrderPaymentFailed(params: {
   orderId: string
   providerPaymentId?: string
   raw?: unknown
-  webhookIdempotencyKey: string
+  webhookIdempotencyKey?: string
 }) {
   const supabase = getSupabaseAdmin()
 
@@ -302,105 +404,138 @@ export async function markOrderPaymentFailed(params: {
   if (order.payment_status === 'paid') {
     return { ok: true, ignored: true as const }
   }
-  if (order.payment_status === 'failed') {
-    return { ok: true, duplicate: true as const }
-  }
 
-  const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id)
-  for (const item of items ?? []) {
-    await releaseStock(
-      item.product_sku_snapshot,
-      item.quantity,
-      `${params.webhookIdempotencyKey}:release:${item.product_sku_snapshot}`
-    ).catch(() => null)
-  }
+  const cancelled = await cancelPendingOrder(order.id)
 
-  await supabase
-    .from('orders')
-    .update({
-      status: 'cancelled',
-      payment_status: 'failed',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', order.id)
-
+  // Keep the checkout token in provider_payment_id so a late successful payment
+  // can still be matched and verified.
   await supabase
     .from('payments')
     .update({
       status: 'failed',
-      provider_payment_id: params.providerPaymentId ?? null,
       raw_response: (params.raw as import('@/types/database').Json) ?? null,
-      idempotency_key: params.webhookIdempotencyKey,
       updated_at: new Date().toISOString(),
     })
     .eq('order_id', order.id)
+    .neq('status', 'paid')
 
-  return { ok: true, duplicate: false as const }
+  return { ok: true, duplicate: !cancelled }
 }
 
 export async function finalizePaidOrder(params: {
   orderId: string
+  /** iyzico checkout-form token (verified against the token we stored at initialize) */
+  token?: string
   providerPaymentId?: string
   amount?: number
+  currency?: string
   raw?: unknown
-  webhookIdempotencyKey: string
+  /** @deprecated idempotency is now enforced by an atomic paid-claim on the order */
+  webhookIdempotencyKey?: string
 }) {
   const supabase = getSupabaseAdmin()
 
-  const { data: existingPayment } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('idempotency_key', params.webhookIdempotencyKey)
-    .maybeSingle()
-
-  if (existingPayment?.status === 'paid') {
-    return { ok: true, duplicate: true }
-  }
-
   const { data: order } = await supabase.from('orders').select('*').eq('id', params.orderId).single()
   if (!order) throw new Error('Order not found')
-
-  if (params.amount != null && Math.abs(Number(params.amount) - Number(order.total)) > 0.01) {
-    throw new Error('Payment amount mismatch')
-  }
 
   if (order.payment_status === 'paid') {
     return { ok: true, duplicate: true }
   }
 
-  const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id)
-
-  for (const item of items ?? []) {
-    const ok = await commitStock(
-      item.product_sku_snapshot,
-      item.quantity,
-      order.id,
-      `${params.webhookIdempotencyKey}:commit:${item.product_sku_snapshot}`
-    )
-    if (!ok) {
-      throw new Error(`Stock commit failed for ${item.product_sku_snapshot}`)
-    }
+  // Amount MUST be provided by the (verified) provider response and match exactly.
+  if (params.amount == null || !Number.isFinite(params.amount)) {
+    throw new Error('Payment amount missing')
+  }
+  if (Math.abs(Number(params.amount) - Number(order.total)) > 0.01) {
+    throw new Error('Payment amount mismatch')
+  }
+  if (params.currency && params.currency.toUpperCase() !== String(order.currency).toUpperCase()) {
+    throw new Error('Payment currency mismatch')
   }
 
-  await supabase
+  // The checkout token must be the one we issued for THIS order.
+  if (params.token) {
+    const { data: tokenRow } = await supabase
+      .from('payments')
+      .select('id')
+      .eq('order_id', order.id)
+      .eq('provider_payment_id', params.token)
+      .limit(1)
+      .maybeSingle()
+    if (!tokenRow) throw new Error('Payment token mismatch')
+  }
+
+  // Atomic claim: only one concurrent caller can flip the order to paid.
+  // 1) normal path — stock is still reserved
+  const now = new Date().toISOString()
+  let lateReleased = false
+  let { data: claimed } = await supabase
     .from('orders')
-    .update({
-      status: 'payment_received',
-      payment_status: 'paid',
-      updated_at: new Date().toISOString(),
-    })
+    .update({ status: 'payment_received', payment_status: 'paid', updated_at: now })
     .eq('id', order.id)
+    .eq('payment_status', 'pending')
+    .select('id')
+    .maybeSingle()
+  // 2) late payment on an order we already cancelled/expired — reservation was released
+  if (!claimed) {
+    const late = await supabase
+      .from('orders')
+      .update({ status: 'payment_received', payment_status: 'paid', updated_at: now })
+      .eq('id', order.id)
+      .eq('payment_status', 'failed')
+      .select('id')
+      .maybeSingle()
+    claimed = late.data
+    lateReleased = Boolean(claimed)
+  }
+  if (!claimed) {
+    return { ok: true, duplicate: true }
+  }
 
   await supabase
     .from('payments')
     .update({
       status: 'paid',
-      provider_payment_id: params.providerPaymentId ?? null,
+      provider_payment_id: params.providerPaymentId ?? params.token ?? null,
       raw_response: (params.raw as import('@/types/database').Json) ?? null,
-      idempotency_key: params.webhookIdempotencyKey,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
     .eq('order_id', order.id)
+
+  // From here on the customer HAS paid: never throw — flag problems for manual follow-up.
+  const problems: string[] = []
+  const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id)
+
+  for (const item of items ?? []) {
+    const sku = item.product_sku_snapshot
+    try {
+      if (lateReleased) {
+        const reservedAgain = await reserveStock(sku, item.quantity, `late:${order.id}:reserve:${sku}`)
+        if (!reservedAgain) {
+          problems.push(`STOK_YETERSIZ:${sku}`)
+          continue
+        }
+      }
+      const committed = await commitStock(sku, item.quantity, order.id, `order:${order.id}:commit:${sku}`)
+      if (!committed) {
+        problems.push(`COMMIT_BASARISIZ:${sku}`)
+        continue
+      }
+      const decremented = await decrementCmsStock(sku, item.quantity)
+      if (!decremented) problems.push(`CMS_STOK_DUSULMEDI:${sku}`)
+    } catch (err) {
+      console.error('[finalizePaidOrder] stock step failed', sku, err instanceof Error ? err.message : '')
+      problems.push(`STOK_HATASI:${sku}`)
+    }
+  }
+
+  if (problems.length) {
+    console.error('[finalizePaidOrder] needs attention', { orderId: order.id, problems })
+    await supabase
+      .from('orders')
+      .update({ notes: appendNote(order.notes, `ATTENTION:${problems.join(',')}`) })
+      .eq('id', order.id)
+  }
 
   if (order.coupon_code) {
     const { data: coupon } = await supabase
@@ -418,12 +553,8 @@ export async function finalizePaidOrder(params: {
     }
   }
 
-  // Clear cart after successful payment (user or guest via notes cart_id)
-  const cartIdFromNotes =
-    typeof order.notes === 'string' && order.notes.startsWith('cart_id:')
-      ? order.notes.slice('cart_id:'.length)
-      : null
-  const cartId = (order as { cart_id?: string | null }).cart_id || cartIdFromNotes
+  // Clear the cart after successful payment (user or guest)
+  const cartId = (order as OrderRow).cart_id || cartIdFromNotes(order.notes)
   if (cartId) {
     await supabase.from('cart_items').delete().eq('cart_id', cartId)
   } else if (order.user_id) {
@@ -438,6 +569,11 @@ export async function finalizePaidOrder(params: {
   }
 
   return { ok: true, duplicate: false }
+}
+
+function cartIdFromNotes(notes: string | null | undefined): string | null {
+  const first = typeof notes === 'string' ? notes.split(';')[0] : null
+  return first && first.startsWith('cart_id:') ? first.slice('cart_id:'.length) : null
 }
 
 export async function getOrderById(orderId: string) {

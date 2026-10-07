@@ -31,17 +31,9 @@ export default async function AppAdminLayout({ children }: { children: React.Rea
       <div className="container-page flex min-h-[70vh] flex-col items-center justify-center py-20 text-center">
         <h1 className="font-display text-4xl text-espresso">Yetki yok</h1>
         <p className="mt-4 max-w-md text-muted">
-          Bu hesap operasyon paneline erişemiyor. Giriş yaptığınız e-posta:{' '}
-          <strong className="text-espresso">{user.email}</strong>
+          Bu hesap operasyon paneline erişemiyor. Erişim gerekiyorsa site yöneticisiyle iletişime
+          geçin.
         </p>
-        <p className="mt-3 max-w-lg text-sm text-muted">
-          Çözüm: <code className="text-espresso">.env.local</code> içinde{' '}
-          <code className="text-espresso">ADMIN_EMAILS</code> satırına bu e-postayı ekleyin, veya
-          terminalde çalıştırın:
-        </p>
-        <pre className="mt-4 max-w-full overflow-x-auto border border-border bg-ivory px-4 py-3 text-left text-xs text-espresso">
-          {`npx tsx scripts/promote-admin.mts ${user.email}`}
-        </pre>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link href="/account">
             <Button variant="secondary">Hesabıma dön</Button>

@@ -15,7 +15,23 @@ export function formatPrice(amount: number, currency = 'TRY') {
 }
 
 export function getSiteUrl() {
-  return process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+  if (configured) return configured
+  // On Vercel, fall back to the project's own production domain instead of localhost.
+  const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim()
+  if (vercelHost) return `https://${vercelHost}`
+  return 'http://localhost:3000'
+}
+
+/**
+ * Accepts only same-origin relative paths for post-login redirects.
+ * Rejects `//host`, `/\host` (browsers normalise `\` to `/`), control characters and schemes.
+ */
+export function safeRedirectPath(raw: string | null | undefined, fallback = '/'): string {
+  if (!raw || raw[0] !== '/') return fallback
+  if (raw[1] === '/' || raw[1] === '\\') return fallback
+  if (/[\\\u0000-\u001f\u007f]/.test(raw)) return fallback
+  return raw
 }
 
 export function absoluteUrl(path: string) {
