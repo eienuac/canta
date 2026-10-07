@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url'
 import { buildConfig } from 'payload'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { s3Storage } from '@payloadcms/storage-s3'
 import { tr } from '@payloadcms/translations/languages/tr'
 import sharp from 'sharp'
 
@@ -60,6 +61,12 @@ function getPostgresPoolConfig() {
   }
 }
 
+const s3Bucket = process.env.S3_BUCKET || 'media'
+const supabasePublicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/+$/, '')
+const s3Enabled = Boolean(
+  process.env.S3_ENDPOINT && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY,
+)
+
 export default buildConfig({
   admin: {
     user: Users.slug,
@@ -89,6 +96,31 @@ export default buildConfig({
     push: false,
   }),
   sharp,
+  plugins: [
+    // Vercel's filesystem is ephemeral, so media lives in the Supabase Storage bucket.
+    s3Storage({
+      enabled: s3Enabled,
+      bucket: s3Bucket,
+      // Browser uploads straight to storage; Vercel rejects request bodies over 4.5 MB.
+      clientUploads: true,
+      collections: {
+        media: {
+          disablePayloadAccessControl: true,
+          generateFileURL: ({ filename, prefix }) =>
+            `${supabasePublicUrl}/storage/v1/object/public/${s3Bucket}/${prefix ? `${prefix}/` : ''}${filename}`,
+        },
+      },
+      config: {
+        endpoint: process.env.S3_ENDPOINT,
+        region: process.env.S3_REGION,
+        forcePathStyle: true,
+        credentials: {
+          accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+        },
+      },
+    }),
+  ],
   i18n: {
     supportedLanguages: { tr },
     fallbackLanguage: 'tr',
