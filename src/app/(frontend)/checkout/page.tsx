@@ -31,6 +31,7 @@ export default function CheckoutPage() {
   const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [shippingMethod, setShippingMethod] = useState<'standard' | 'express'>('standard')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [shippingQuotes, setShippingQuotes] = useState<
     Array<{ method: 'standard' | 'express'; label: string; cost: number; eta: string }>
   >([])
@@ -114,6 +115,10 @@ export default function CheckoutPage() {
       toast.error('Sepetinizde stok sorunu var. Sepete dönüp güncelleyin.')
       return
     }
+    if (!acceptedTerms) {
+      toast.error('Devam etmek için Ön Bilgilendirme Formu ve Mesafeli Satış Sözleşmesi’ni onaylayın.')
+      return
+    }
     setSubmitting(true)
     try {
       await refresh()
@@ -141,6 +146,7 @@ export default function CheckoutPage() {
           shippingMethod,
           address: form,
           couponCode: couponCode || undefined,
+          acceptedTerms,
           idempotencyKey: nanoid(),
         }),
       })
@@ -291,6 +297,27 @@ export default function CheckoutPage() {
             </div>
           )}
 
+          {step === STEPS.length - 1 && (
+            <label className="flex items-start gap-3 text-sm text-espresso">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+              />
+              <span>
+                <Link href="/pages/on-bilgilendirme-formu" target="_blank" className="underline">
+                  Ön Bilgilendirme Formu
+                </Link>
+                ’nu ve{' '}
+                <Link href="/pages/mesafeli-satis-sozlesmesi" target="_blank" className="underline">
+                  Mesafeli Satış Sözleşmesi
+                </Link>
+                ’ni okudum, kabul ediyorum.
+              </span>
+            </label>
+          )}
+
           <div className="flex gap-3">
             {step > 0 && (
               <Button type="button" variant="secondary" onClick={() => setStep((s) => s - 1)}>
@@ -305,7 +332,7 @@ export default function CheckoutPage() {
               <Button
                 type="button"
                 onClick={placeOrder}
-                disabled={submitting || checkoutBlocked || hasStockIssues}
+                disabled={submitting || checkoutBlocked || hasStockIssues || !acceptedTerms}
               >
                 {submitting ? 'İşleniyor…' : 'Ödemeye Geç'}
               </Button>

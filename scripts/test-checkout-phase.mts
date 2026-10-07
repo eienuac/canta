@@ -52,6 +52,7 @@ async function main() {
       cartId,
       guestToken: 'wrong-token-xxxxxxxx',
       shippingMethod: 'standard',
+      acceptedTerms: true,
       address: {
         firstName: 'Test',
         lastName: 'User',
@@ -83,6 +84,7 @@ async function main() {
         city: 'Istanbul',
         addressLine: 'Test mahalle cadde no 1',
       },
+      acceptedTerms: true,
       idempotencyKey: nanoid(),
     }),
   })

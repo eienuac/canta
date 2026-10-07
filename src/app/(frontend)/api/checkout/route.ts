@@ -38,6 +38,12 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
+    if (body?.acceptedTerms !== true) {
+      return NextResponse.json(
+        { error: 'Ön Bilgilendirme Formu ve Mesafeli Satış Sözleşmesi onaylanmalıdır' },
+        { status: 400 },
+      )
+    }
     const user = await resolveUser(request)
 
     const parsed = checkoutSchema.parse({

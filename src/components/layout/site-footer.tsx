@@ -13,6 +13,7 @@ const LEGAL = [
   { href: '/pages/gizlilik-politikasi', label: 'Gizlilik Politikası' },
   { href: '/pages/cerez-politikasi', label: 'Çerez Politikası' },
   { href: '/pages/kullanim-kosullari', label: 'Kullanım Koşulları' },
+  { href: '/pages/on-bilgilendirme-formu', label: 'Ön Bilgilendirme Formu' },
   { href: '/pages/mesafeli-satis-sozlesmesi', label: 'Mesafeli Satış Sözleşmesi' },
 ]
 
