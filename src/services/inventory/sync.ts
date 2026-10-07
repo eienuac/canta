@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import type { Product } from '@/payload-types'
 
 type SyncableVariant = {
@@ -350,7 +351,7 @@ async function withProductStockLock<T>(
       client.release()
     }
     if (Date.now() > deadline) throw new Error(`stock lock timeout for product ${productId}`)
-    await new Promise((r) => setTimeout(r, 40 + Math.floor(Math.random() * 60)))
+    await new Promise((r) => setTimeout(r, 40 + randomInt(60)))
   }
 }
 

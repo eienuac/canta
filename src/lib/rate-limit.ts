@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import { headers } from 'next/headers'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
@@ -31,7 +32,7 @@ export async function rateLimit(key: string, limit = 20, windowMs = 60_000): Pro
     if (error) throw error
 
     // Opportunistic cleanup of stale buckets (≈1% of calls).
-    if (Math.random() < 0.01) {
+    if (randomInt(100) === 0) {
       void supabase
         .from('rate_limits')
         .delete()

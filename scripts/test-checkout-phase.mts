@@ -6,6 +6,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import { nanoid } from 'nanoid'
+import { logSafe } from './safe-log.mts'
 
 function loadEnvLocal() {
   const envPath = path.join(process.cwd(), '.env.local')
@@ -65,7 +66,7 @@ async function main() {
     }),
   })
   const badBody = await bad.json()
-  console.log('OWNERSHIP', bad.status, badBody.error)
+  logSafe('OWNERSHIP', bad.status, badBody.error)
   if (bad.ok) throw new Error('expected ownership failure')
 
   // Valid guest checkout — expect 503 without payment keys (fail-closed), or redirect URL with keys
@@ -89,12 +90,12 @@ async function main() {
     }),
   })
   const okBody = await okReq.json()
-  console.log('CHECKOUT', okReq.status, okBody)
+  logSafe('CHECKOUT', okReq.status, okBody)
 
   if (okReq.status === 503 || (okBody.error && /configured/i.test(okBody.error))) {
     console.log('FAIL_CLOSED_OK (payment not configured)')
   } else if (okReq.ok && okBody.paymentPageUrl) {
-    console.log('PAYMENT_INIT_OK', okBody.orderNumber)
+    logSafe('PAYMENT_INIT_OK', okBody.orderNumber)
   } else if (okReq.ok && !okBody.paymentPageUrl) {
     throw new Error('checkout ok but no paymentPageUrl — mock success not allowed')
   } else {

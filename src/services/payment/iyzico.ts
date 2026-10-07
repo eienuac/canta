@@ -126,6 +126,9 @@ export class IyzicoPaymentProvider implements PaymentProvider {
   }
 
   async createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
+    const buyerIp = input.buyer.ip?.trim()
+    if (!buyerIp) throw new Error('Ödeme için müşteri IP adresi gerekli')
+
     const { baseUrl } = this.credentials
     const path = '/payment/iyzipos/checkoutform/initialize/auth/ecom'
 
@@ -161,7 +164,7 @@ export class IyzicoPaymentProvider implements PaymentProvider {
         email: input.buyer.email,
         identityNumber: input.buyer.identityNumber || '11111111111',
         registrationAddress: input.buyer.address,
-        ip: input.buyer.ip || '85.34.78.112',
+        ip: buyerIp,
         city: input.buyer.city,
         country: input.buyer.country || 'Turkey',
       },

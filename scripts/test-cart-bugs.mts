@@ -5,6 +5,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { nanoid } from 'nanoid'
 import pg from 'pg'
+import { logSafe } from './safe-log.mts'
 
 const { Client } = pg
 
@@ -39,7 +40,7 @@ async function main() {
     body: JSON.stringify({ productId: '1', sku: '123', quantity: 1, guestToken }),
   })
   const addBody = await add.json()
-  console.log('ADD', add.status, addBody.item?.id ? 'ok' : addBody)
+  logSafe('ADD', add.status, addBody.item?.id ? 'ok' : addBody)
   if (!add.ok) throw new Error('add failed')
 
   // Zero CMS stock
@@ -112,7 +113,7 @@ async function main() {
     body: JSON.stringify({ guestToken }),
   })
   const mergeBody = await merge.json()
-  console.log('MERGE', merge.status, mergeBody)
+  logSafe('MERGE', merge.status, mergeBody)
   if (!merge.ok) throw new Error(`merge failed: ${JSON.stringify(mergeBody)}`)
 
   const userCart = await fetch(`${site}/api/cart`, { headers: { Cookie: cookie } })

@@ -3,6 +3,7 @@
  */
 import { createClient } from '@supabase/supabase-js'
 import { nanoid } from 'nanoid'
+import { logSafe } from './safe-log.mts'
 
 async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -50,7 +51,7 @@ async function main() {
     }),
   })
   const postBody = await post.json()
-  console.log('POST add', post.status, postBody)
+  logSafe('POST add', post.status, postBody)
   if (!post.ok) throw new Error(`POST add failed: ${JSON.stringify(postBody)}`)
 
   // GET with items
@@ -72,7 +73,7 @@ async function main() {
     body: JSON.stringify({ itemId, quantity: 3 }),
   })
   const patchBody = await patch.json()
-  console.log('PATCH qty', patch.status, patchBody)
+  logSafe('PATCH qty', patch.status, patchBody)
   if (!patch.ok) throw new Error(`PATCH failed: ${JSON.stringify(patchBody)}`)
 
   // Stock reject: try qty 999
@@ -82,7 +83,7 @@ async function main() {
     body: JSON.stringify({ itemId, quantity: 999 }),
   })
   const overBody = await over.json()
-  console.log('PATCH overstock', over.status, overBody)
+  logSafe('PATCH overstock', over.status, overBody)
   if (over.ok) throw new Error('expected overstock to fail')
   if (!String(overBody.error || '').toLowerCase().includes('stok')) {
     throw new Error(`unexpected overstock error: ${JSON.stringify(overBody)}`)
@@ -129,7 +130,7 @@ async function main() {
     body: JSON.stringify({ guestToken }),
   })
   const mergeBody = await merge.json()
-  console.log('MERGE', merge.status, mergeBody)
+  logSafe('MERGE', merge.status, mergeBody)
   if (!merge.ok) throw new Error(`merge failed: ${JSON.stringify(mergeBody)}`)
 
   const userCart = await fetch(`${site}/api/cart`, { headers: { Cookie: cookieHeader } })

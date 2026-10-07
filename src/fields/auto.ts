@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import type { Field, TextField } from 'payload'
 import slugify from 'slugify'
 
@@ -8,7 +9,7 @@ export function toSlug(input: string) {
 function randomCode(length = 6) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   let out = ''
-  for (let i = 0; i < length; i++) out += chars[Math.floor(Math.random() * chars.length)]
+  for (let i = 0; i < length; i++) out += chars[randomInt(chars.length)]
   return out
 }
 

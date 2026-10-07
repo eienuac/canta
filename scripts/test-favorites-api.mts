@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { logSafe } from './safe-log.mts'
 
 /**
  * End-to-end: create user → sign in → call local /api/favorites with auth cookies.
@@ -69,7 +70,7 @@ async function main() {
     body: JSON.stringify({ productId: '1' }),
   })
   const postBody = await post.json()
-  console.log('POST status', post.status, postBody)
+  logSafe('POST status', post.status, postBody)
 
   if (!post.ok) {
     throw new Error(`API POST failed: ${JSON.stringify(postBody)}`)
@@ -82,7 +83,7 @@ async function main() {
     headers: { Cookie: cookieHeader },
   })
   const getBody = await get.json()
-  console.log('GET status', get.status, getBody)
+  logSafe('GET status', get.status, getBody)
   if (!get.ok || getBody.favorited !== true) {
     throw new Error(`API GET failed: ${JSON.stringify(getBody)}`)
   }
@@ -97,7 +98,7 @@ async function main() {
     body: JSON.stringify({ productId: '1' }),
   })
   const post2Body = await post2.json()
-  console.log('POST toggle-off', post2.status, post2Body)
+  logSafe('POST toggle-off', post2.status, post2Body)
   if (!post2.ok || post2Body.favorited !== false) {
     throw new Error(`toggle-off failed: ${JSON.stringify(post2Body)}`)
   }
