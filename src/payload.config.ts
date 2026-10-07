@@ -79,6 +79,7 @@ export default buildConfig({
     },
     components: {
       afterNavLinks: ['@/components/admin/AdminAppLink#AdminAppLink'],
+      actions: ['@/components/admin/AdminAppLink#SiteLinkAction'],
     },
   },
   collections: [Users, Media, Categories, Collections, Products, Pages],
