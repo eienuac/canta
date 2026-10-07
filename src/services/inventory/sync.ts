@@ -306,16 +306,67 @@ export async function releaseStock(sku: string, qty: number, idempotencyKey: str
 }
 
 /**
+ * Runs `fn` while holding a transaction-scoped Postgres advisory lock for this product, so read-modify-write
+ * updates of the CMS stock from different serverless instances cannot overwrite each other.
+ * The lock is polled (try-lock + short sleeps) instead of blocking, so waiters never hold a
+ * pool connection while the lock owner still needs one for its own update.
+ */
+async function withProductStockLock<T>(
+  payload: { db: unknown },
+  productId: string | number,
+  fn: () => Promise<T>
+): Promise<T> {
+  type PgPool = {
+    connect: () => Promise<{
+      query: (sql: string, params?: unknown[]) => Promise<{ rows: Array<Record<string, unknown>> }>
+      release: () => void
+    }>
+  }
+  const pool = (payload.db as { pool?: PgPool }).pool
+  if (!pool) return fn() // adapter without pool access: fall back to unlocked update
+
+  const key = `cms-stock-tx:${productId}`
+  const deadline = Date.now() + 50_000
+  for (;;) {
+    const client = await pool.connect()
+    try {
+      // Transaction-scoped lock: works behind Supabase's transaction pooler (port 6543), where
+      // session-level advisory locks are NOT reliable. The transaction stays open while fn runs
+      // (the backend is pinned for that time) and COMMIT releases the lock.
+      await client.query('begin')
+      const res = await client.query('select pg_try_advisory_xact_lock(hashtext($1)) as ok', [key])
+      if (res.rows[0]?.ok === true) {
+        try {
+          return await fn()
+        } finally {
+          await client.query('commit').catch(() => null)
+        }
+      }
+      await client.query('rollback').catch(() => null)
+    } catch (err) {
+      await client.query('rollback').catch(() => null)
+      throw err
+    } finally {
+      client.release()
+    }
+    if (Date.now() > deadline) throw new Error(`stock lock timeout for product ${productId}`)
+    await new Promise((r) => setTimeout(r, 40 + Math.floor(Math.random() * 60)))
+  }
+}
+
+/**
  * Decrement the CMS stock (source of truth for storefront availability) after a
  * paid sale. Without this, inventory.quantity is reset from the CMS on the next
  * product save and sold units reappear.
- * Callers must guarantee single execution per order (paid claim).
+ * Callers must guarantee single execution per order (paid claim); concurrent orders for the
+ * same product are serialised by an advisory lock and always re-read the current stock.
  */
 export async function decrementCmsStock(sku: string, qty: number): Promise<boolean> {
   try {
     const { getPayloadClient } = await import('@/lib/payload')
     const payload = await getPayloadClient()
 
+    // 1) locate the product (variant SKU first, then main SKU)
     const byVariant = await payload.find({
       collection: 'products',
       where: { 'variants.sku': { equals: sku } },
@@ -324,42 +375,59 @@ export async function decrementCmsStock(sku: string, qty: number): Promise<boole
       overrideAccess: true,
       locale: 'tr',
     })
-    const variantProduct = byVariant.docs[0] as Product | undefined
-    if (variantProduct?.variants?.some((v) => v.sku === sku)) {
-      const variants = variantProduct.variants.map((v) =>
-        v.sku === sku ? { ...v, stock: Math.max(0, normalizeStock(v.stock) - qty) } : v
-      )
-      await payload.update({
+    let located = byVariant.docs[0] as Product | undefined
+    if (!located?.variants?.some((v) => v.sku === sku)) {
+      const bySku = await payload.find({
         collection: 'products',
-        id: variantProduct.id,
-        data: { variants },
+        where: { sku: { equals: sku } },
+        limit: 1,
         depth: 0,
         overrideAccess: true,
         locale: 'tr',
       })
-      return true
+      located = bySku.docs[0] as Product | undefined
     }
+    if (!located) return false
+    const productId = located.id
 
-    const bySku = await payload.find({
-      collection: 'products',
-      where: { sku: { equals: sku } },
-      limit: 1,
-      depth: 0,
-      overrideAccess: true,
-      locale: 'tr',
-    })
-    const product = bySku.docs[0] as Product | undefined
-    if (product) {
-      await payload.update({
+    // 2) under the lock: re-read the CURRENT stock, subtract, write
+    return await withProductStockLock(payload, productId, async () => {
+      const fresh = (await payload.findByID({
         collection: 'products',
-        id: product.id,
-        data: { stock: Math.max(0, normalizeStock(product.stock) - qty) },
+        id: productId,
         depth: 0,
         overrideAccess: true,
         locale: 'tr',
-      })
-      return true
-    }
+      })) as Product
+
+      const variant = fresh.variants?.find((v) => v.sku === sku)
+      if (variant) {
+        const variants = fresh.variants!.map((v) =>
+          v.sku === sku ? { ...v, stock: Math.max(0, normalizeStock(v.stock) - qty) } : v
+        )
+        await payload.update({
+          collection: 'products',
+          id: productId,
+          data: { variants },
+          depth: 0,
+          overrideAccess: true,
+          locale: 'tr',
+        })
+        return true
+      }
+      if (fresh.sku === sku) {
+        await payload.update({
+          collection: 'products',
+          id: productId,
+          data: { stock: Math.max(0, normalizeStock(fresh.stock) - qty) },
+          depth: 0,
+          overrideAccess: true,
+          locale: 'tr',
+        })
+        return true
+      }
+      return false
+    })
   } catch (err) {
     console.error('[decrementCmsStock]', sku, err instanceof Error ? err.message : 'unknown')
   }

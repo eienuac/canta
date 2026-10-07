@@ -11,6 +11,7 @@ import { signOrderAccess } from '@/lib/order-token'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 type Verified = {
   valid: boolean

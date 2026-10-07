@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { connection } from 'next/server'
 import { Cormorant_Garamond, Manrope } from 'next/font/google'
 import { AuthProvider } from '@/hooks/use-auth'
 import { CartProvider } from '@/hooks/use-cart'
@@ -73,6 +74,9 @@ async function safeCategories(): Promise<HeaderCategory[]> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // The CSP nonce is generated per request in proxy.ts, so every page must render per request.
+  await connection()
+
   let categories: HeaderCategory[] = []
   try {
     categories = await safeCategories()

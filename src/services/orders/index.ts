@@ -240,6 +240,16 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
     if (itemsError) throw itemsError
     itemsInserted = true
 
+    // Atomic coupon limit check (serialised in the DB). The pre-check in validateCoupon is
+    // only a fast path; this one cannot be raced by parallel checkouts.
+    if (couponCode) {
+      const { data: claimOk, error: claimError } = await supabase.rpc('coupon_claim_ok', {
+        p_order_id: order.id,
+      })
+      if (claimError) throw claimError
+      if (!claimOk) throw new Error('Kupon kullanım limitine ulaşıldı')
+    }
+
     const provider = getPaymentProvider()
     const paymentInit = await provider.createPayment({
       orderId: order.id,

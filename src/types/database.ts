@@ -210,6 +210,10 @@ export type Database = {
     }
     Views: Record<string, never>
     Functions: {
+      coupon_claim_ok: {
+        Args: { p_order_id: string }
+        Returns: boolean
+      }
       rate_limit_hit: {
         Args: { p_key: string; p_limit: number; p_window_seconds: number }
         Returns: boolean
