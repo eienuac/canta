@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { RichText } from '@payloadcms/richtext-lexical/react'
+import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
 import { getProductBySlug, getRelatedProducts, listApprovedSafe } from '@/services/products/detail'
 import { ProductGallery } from '@/components/product/product-gallery'
 import { ProductPurchasePanel } from '@/components/product/product-purchase-panel'
@@ -37,6 +39,12 @@ export default async function ProductDetailPage({ params }: Props) {
     getRelatedProducts(product.id).catch(() => []),
     listApprovedSafe(product.id),
   ])
+
+  const dimensions = product.dimensions
+    ? [product.dimensions.width, product.dimensions.height, product.dimensions.depth]
+        .filter(Boolean)
+        .join(' × ')
+    : ''
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -97,22 +105,22 @@ export default async function ProductDetailPage({ params }: Props) {
       <section className="mt-16 grid gap-10 border-t border-border pt-12 md:grid-cols-2">
         <div>
           <h2 className="font-display text-2xl text-espresso">Açıklama</h2>
-          <p className="mt-4 whitespace-pre-line text-muted leading-relaxed">
-            {product.shortDescription || 'Ürün açıklaması yakında eklenecek.'}
-          </p>
+          {hasRichText(product.description) ? (
+            <RichText
+              data={product.description}
+              className="mt-4 space-y-4 text-muted leading-relaxed"
+            />
+          ) : (
+            <p className="mt-4 whitespace-pre-line text-muted leading-relaxed">
+              {product.shortDescription || 'Ürün açıklaması yakında eklenecek.'}
+            </p>
+          )}
         </div>
         <div className="space-y-4 text-sm">
           {product.leatherType && <Row label="Deri türü" value={product.leatherType} />}
           {product.material && <Row label="Malzeme" value={product.material} />}
           {product.weight && <Row label="Ağırlık" value={product.weight} />}
-          {product.dimensions && (
-            <Row
-              label="Ölçüler"
-              value={[product.dimensions.width, product.dimensions.height, product.dimensions.depth]
-                .filter(Boolean)
-                .join(' × ')}
-            />
-          )}
+          {dimensions && <Row label="Ölçüler" value={dimensions} />}
           {product.careInstructions && <Row label="Bakım" value={product.careInstructions} />}
           {product.shippingInfo && <Row label="Kargo" value={product.shippingInfo} />}
           {product.returnInfo && <Row label="İade" value={product.returnInfo} />}
@@ -153,6 +161,15 @@ export default async function ProductDetailPage({ params }: Props) {
       )}
     </div>
   )
+}
+
+function hasRichText(value: unknown): value is SerializedEditorState {
+  const children = (value as SerializedEditorState | null)?.root?.children
+  if (!Array.isArray(children)) return false
+  return children.some((node) => {
+    const nodeChildren = (node as { children?: unknown }).children
+    return Array.isArray(nodeChildren) && nodeChildren.length > 0
+  })
 }
 
 function Row({ label, value }: { label: string; value: string }) {
