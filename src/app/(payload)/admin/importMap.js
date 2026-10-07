@@ -24,6 +24,7 @@ import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 import { AdminAppLink as AdminAppLink_operasyon } from '@/components/admin/AdminAppLink'
 import { SiteLinkAction as SiteLinkAction_site } from '@/components/admin/AdminAppLink'
+import { PublishAndRedirect as PublishAndRedirect_products } from '@/components/admin/PublishAndRedirect'
 import { S3ClientUploadHandler as S3ClientUploadHandler_storage } from '@payloadcms/storage-s3/client'
 
 /** @type import('payload').ImportMap */
@@ -54,5 +55,6 @@ export const importMap = {
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
   "@/components/admin/AdminAppLink#AdminAppLink": AdminAppLink_operasyon,
   "@/components/admin/AdminAppLink#SiteLinkAction": SiteLinkAction_site,
+  "@/components/admin/PublishAndRedirect#PublishAndRedirect": PublishAndRedirect_products,
   "@payloadcms/storage-s3/client#S3ClientUploadHandler": S3ClientUploadHandler_storage
 }

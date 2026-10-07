@@ -12,13 +12,14 @@ export const Products: CollectionConfig = {
     useAsTitle: 'name',
     group: 'Katalog',
     defaultColumns: ['name', 'sku', 'price', 'stock', '_status', 'updatedAt'],
-  },
-  versions: {
-    drafts: {
-      autosave: {
-        interval: 2000,
+    components: {
+      edit: {
+        PublishButton: '@/components/admin/PublishAndRedirect#PublishAndRedirect',
       },
     },
+  },
+  versions: {
+    drafts: true,
   },
   access: {
     read: ({ req }) => {
