@@ -17,15 +17,25 @@ const LEGAL = [
   { href: '/pages/mesafeli-satis-sozlesmesi', label: 'Mesafeli Satış Sözleşmesi' },
 ]
 
+/** Turkish number (0312…, +90312…) → wa.me link, or null if it is not a full number. */
+function whatsappUrl(phone?: string | null) {
+  const digits = (phone || '').replace(/\D/g, '').replace(/^0/, '')
+  const intl = digits.startsWith('90') ? digits : `90${digits}`
+  return intl.length === 12 ? `https://wa.me/${intl}` : null
+}
+
 export function SiteFooter({
   brandName = 'Seçkin Çanta',
   tagline = 'Zamansız deri.',
   social,
+  phone,
 }: {
   brandName?: string
   tagline?: string
-  social?: { instagram?: string | null; facebook?: string | null; pinterest?: string | null }
+  social?: { instagram?: string | null; facebook?: string | null; pinterest?: string | null } | null
+  phone?: string | null
 }) {
+  const whatsapp = whatsappUrl(phone)
   return (
     <footer className="mt-24 border-t border-border bg-ivory">
       <div className="container-page grid gap-12 py-16 md:grid-cols-4">
@@ -34,6 +44,11 @@ export function SiteFooter({
           <p className="sr-only">{brandName}</p>
           <p className="mt-3 max-w-xs text-sm text-muted">{tagline}</p>
           <div className="mt-6 flex gap-4 text-sm text-espresso">
+            {whatsapp && (
+              <a href={whatsapp} target="_blank" rel="noreferrer">
+                WhatsApp
+              </a>
+            )}
             {social?.instagram && (
               <a href={social.instagram} target="_blank" rel="noreferrer">
                 Instagram

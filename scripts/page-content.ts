@@ -1,6 +1,6 @@
 /**
  * Footer page texts, written into the CMS `pages` collection by a one-off seed.
- * Pages marked `publish: false` still contain {{PLACEHOLDER}} values and stay as drafts.
+ * Re-running the seed overwrites edits made in the admin panel.
  */
 export const COMPANY = {
   brand: 'Seçkin Çanta',
@@ -8,40 +8,116 @@ export const COMPANY = {
   type: 'şahıs işletmesi',
   taxOffice: 'Kızılbey Vergi Dairesi',
   taxNo: '10702171762',
-  address: '{{ADRES}}',
-  phone: '{{TELEFON}}',
-  email: '{{EPOSTA}}',
-  site: '{{SITE}}',
+  address: 'Hisarparkı Caddesi No: 12/A, Altındağ / Ankara',
+  phone: '0312 311 55 11',
+  whatsappUrl: 'https://wa.me/903123115511',
+  instagram: 'nuriseckincanta',
+  instagramUrl: 'https://www.instagram.com/nuriseckincanta',
+  mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Hisarpark%C4%B1+Caddesi+12%2FA+Alt%C4%B1nda%C4%9F+Ankara',
+  /** Leave empty until there is a customer e-mail address; every e-mail mention is then omitted. */
+  email: '',
+  site: 'canta-steel.vercel.app',
+  carrier: 'MNG Kargo',
 }
 
 const FREE_LIMIT = '1.500 TL'
 const SHIPPING_FEE = '150 TL'
 
+type Part = string | { text: string; url: string }
+
 export type Block =
   | { h2: string }
   | { h3: string }
   | { p: string }
+  | { parts: Part[] }
   | { ul: string[] }
 
 export type PageSeed = { slug: string; title: string; publish: boolean; blocks: Block[] }
+
+const emailLine = COMPANY.email ? [`E-posta: ${COMPANY.email}`] : []
 
 const sellerBlock: Block = {
   ul: [
     `Satıcı: ${COMPANY.owner} (${COMPANY.brand}, ${COMPANY.type})`,
     `Vergi dairesi / no: ${COMPANY.taxOffice} / ${COMPANY.taxNo}`,
     `Adres: ${COMPANY.address}`,
-    `Telefon: ${COMPANY.phone}`,
-    `E-posta: ${COMPANY.email}`,
+    `Telefon / WhatsApp: ${COMPANY.phone}`,
+    ...emailLine,
     `İnternet sitesi: ${COMPANY.site}`,
   ],
 }
 
+/** "…telefon/WhatsApp hattından, e-posta ile veya … adresine yazılı olarak" */
+const noticeChannels = [
+  `${COMPANY.phone} numaralı telefon / WhatsApp hattından`,
+  ...(COMPANY.email ? [`${COMPANY.email} adresine e-posta göndererek`] : []),
+  `${COMPANY.address} adresine yazılı olarak`,
+].join(', ')
+
 export const PAGES: PageSeed[] = [
+  {
+    slug: 'hakkimizda',
+    title: 'Hakkımızda',
+    publish: true,
+    blocks: [
+      {
+        p: '1967 yılında temelleri atılan Seçkin Çanta, yarım asrı aşan serüveninde 4 kuşaktır kesintisiz olarak çanta ve saraciye sektörüne hizmet vermektedir. Ankara merkezli üretim yolculuğumuzda, ilk günkü esnaflık değerlerimizi modern dünya standartlarıyla harmanlayarak, sektörün güvenilir ve öncü markalarından biri haline geldik.',
+      },
+      {
+        p: 'Seçkin Çanta olarak en büyük farkımız, imalatçı ve toptancı kimliğimizdir. Tasarımdan üretime kadar olan tüm süreçleri kendi bünyemizde, yüksek kalite standartlarında yönetiyoruz. İşin mutfağından gelmenin verdiği uzmanlıkla, güçlü imalat altyapımızı ve geniş ürün yelpazemizi Türkiye genelindeki iş ortaklarımıza avantajlı toptan satış çözümleriyle sunuyoruz.',
+      },
+      {
+        p: 'Köklü geçmişimizden aldığımız zanaatkârlık mirasını, 4. kuşağın yenilikçi ve vizyoner bakış açısıyla birleştiriyoruz. Güven, kalite ve devamlılık ilkeleriyle, yarım asırdır olduğu gibi bugün de modaya ve sektöre yön vermeye devam ediyoruz.',
+      },
+    ],
+  },
+  {
+    slug: 'iletisim',
+    title: 'İletişim',
+    publish: true,
+    blocks: [
+      { h2: 'Telefon ve WhatsApp' },
+      {
+        parts: [
+          `${COMPANY.phone} — `,
+          { text: 'WhatsApp’tan yazın', url: COMPANY.whatsappUrl },
+        ],
+      },
+      ...(COMPANY.email ? [{ h2: 'E-posta' } as Block, { p: COMPANY.email } as Block] : []),
+      { h2: 'Adres' },
+      { parts: [`${COMPANY.address} — `, { text: 'Haritada aç', url: COMPANY.mapsUrl }] },
+      { h2: 'Instagram' },
+      { parts: [{ text: `@${COMPANY.instagram}`, url: COMPANY.instagramUrl }] },
+      { h2: 'Toptan satış' },
+      {
+        p: 'İmalatçı ve toptancı olarak Türkiye genelindeki iş ortaklarımıza toptan satış yapıyoruz. Toptan fiyat ve bayilik bilgisi için telefon veya WhatsApp hattımızdan bize ulaşın.',
+      },
+      { h2: 'Sipariş ve iade' },
+      {
+        p: 'Siparişinizle ilgili yazarken sipariş numaranızı da iletin; size daha hızlı yardımcı olalım.',
+      },
+    ],
+  },
+  {
+    slug: 'magazalar',
+    title: 'Mağazalar',
+    publish: true,
+    blocks: [
+      { h2: 'Ankara' },
+      { p: COMPANY.address },
+      { parts: [`Telefon / WhatsApp: ${COMPANY.phone} — `, { text: 'Haritada aç', url: COMPANY.mapsUrl }] },
+      {
+        p: 'Ziyaretinizden önce telefon veya WhatsApp hattımızdan bilgi alabilirsiniz.',
+      },
+    ],
+  },
   {
     slug: 'kargo-ve-teslimat',
     title: 'Kargo ve Teslimat',
     publish: true,
     blocks: [
+      { h2: 'Kargo firması' },
+      { p: `Siparişlerinizi ${COMPANY.carrier} ile gönderiyoruz.` },
       { h2: 'Kargo ücreti' },
       {
         p: `${FREE_LIMIT} ve üzeri siparişlerde kargo ücretsizdir. ${FREE_LIMIT} altındaki siparişlerde kargo ücreti ${SHIPPING_FEE}’dir.`,
@@ -56,11 +132,13 @@ export const PAGES: PageSeed[] = [
       {
         p: 'Yoğun dönemlerde bu süre uzayabilir; her durumda siparişiniz yasal süre olan 30 gün içinde teslim edilir.',
       },
+      { h2: 'Ödeme' },
+      { p: 'Kapıda ödeme seçeneğimiz yoktur. Ödemeler sipariş sırasında kartla alınır.' },
       { h2: 'Teslimat bölgesi' },
       { p: 'Şu anda yalnızca Türkiye içindeki adreslere gönderim yapıyoruz.' },
       { h2: 'Kargo takibi' },
       {
-        p: 'Üye girişi yaparak verdiğiniz siparişlerde takip numarası, sipariş kargoya verildiğinde Hesabım › Siparişlerim sayfasında görünür. Üye olmadan verdiğiniz siparişler için sipariş numaranızla bize ulaşabilirsiniz.',
+        p: `Üye girişi yaparak verdiğiniz siparişlerde ${COMPANY.carrier} takip numarası, sipariş kargoya verildiğinde Hesabım › Siparişlerim sayfasında görünür. Üye olmadan verdiğiniz siparişler için sipariş numaranızla bize ulaşabilirsiniz.`,
       },
       { h2: 'Teslim alırken' },
       {
@@ -73,19 +151,23 @@ export const PAGES: PageSeed[] = [
     title: 'İade ve Değişim',
     publish: true,
     blocks: [
-      { h2: 'Cayma hakkı' },
+      { h2: 'Değişim' },
+      {
+        p: 'Aldığınız ürünü renk veya model olarak değiştirebilirsiniz. Değişimde hem bize gönderim hem de yeni ürünün size gönderimi için kargo ücretini biz karşılarız. İstediğiniz ürün stokta yoksa ücret iadesi yapılır.',
+      },
+      { h2: 'Cayma hakkı (iade)' },
       {
         p: 'Ürünü teslim aldığınız günden itibaren 14 gün içinde hiçbir gerekçe göstermeden iade edebilirsiniz.',
       },
-      { h2: 'İade kargo ücreti' },
+      { h2: 'İade ve değişim kargo ücreti' },
       {
-        p: 'İade kargo ücreti tarafımızdan karşılanır. Talebiniz onaylandığında size anlaşmalı kargo bilgisi iletilir; ürünü bu bilgiyle ücretsiz gönderebilirsiniz.',
+        p: `İade ve değişim kargo ücretleri tarafımızdan karşılanır. Talebiniz onaylandığında size ${COMPANY.carrier} anlaşmalı gönderi kodu iletilir; ürünü bu kodla ücretsiz gönderebilirsiniz.`,
       },
-      { h2: 'Nasıl iade ederim?' },
+      { h2: 'Nasıl iade veya değişim yaparım?' },
       {
         ul: [
           'Üye girişi yaparak verdiğiniz siparişlerde: Hesabım › Siparişlerim › ilgili sipariş › İade talebi. Bu seçenek sipariş “Teslim Edildi” durumuna geçtiğinde açılır.',
-          'Üye olmadan verdiğiniz siparişlerde: sipariş numaranızla İletişim sayfasındaki kanallardan bize ulaşın.',
+          `Değişim talepleri ve üye olmadan verdiğiniz siparişler için: sipariş numaranızla ${COMPANY.phone} numaralı telefon veya WhatsApp hattımızdan bize ulaşın.`,
         ],
       },
       { h2: 'Ürünün durumu' },
@@ -95,10 +177,6 @@ export const PAGES: PageSeed[] = [
       { h2: 'Para iadesi' },
       {
         p: 'İade tutarı, cayma bildiriminizin bize ulaştığı tarihten itibaren en geç 14 gün içinde ödemeyi yaptığınız karta tek seferde iade edilir. Tutarın hesabınıza yansıma süresi bankanıza göre değişebilir.',
-      },
-      { h2: 'Değişim' },
-      {
-        p: 'Aldığınız ürünü renk veya model olarak değiştirebilirsiniz. Değişimde hem bize gönderim hem de yeni ürünün size gönderimi için kargo ücretini biz karşılarız. İstediğiniz ürün stokta yoksa ücret iadesi yapılır.',
       },
       { h2: 'Kusurlu ürün' },
       {
@@ -112,26 +190,34 @@ export const PAGES: PageSeed[] = [
     publish: true,
     blocks: [
       { h3: 'Siparişim ne zaman gelir?' },
-      { p: 'Ödeme onayından sonra hazırlanıp kargoya verilir; tahmini teslim süresi 2-4 iş günüdür.' },
+      {
+        p: `Ödeme onayından sonra hazırlanıp ${COMPANY.carrier} ile gönderilir; tahmini teslim süresi 2-4 iş günüdür.`,
+      },
       { h3: 'Kargo ücreti ne kadar?' },
       { p: `${FREE_LIMIT} ve üzeri siparişlerde ücretsiz, altında ${SHIPPING_FEE}.` },
-      { h3: 'Üye olmadan sipariş verebilir miyim?' },
-      {
-        p: 'Evet. Giriş sayfasındaki “Müşteri olmadan devam et” ile sepete ekleyip ödeme yapabilirsiniz. Üye olursanız siparişlerinizi ve kargo takibini hesabınızdan görebilirsiniz.',
-      },
+      { h3: 'Kapıda ödeme var mı?' },
+      { p: 'Hayır. Ödemeler sipariş sırasında kredi kartı veya banka kartıyla alınır.' },
       { h3: 'Hangi ödeme yöntemlerini kullanabilirim?' },
       {
         p: 'Kredi kartı ve banka kartıyla, iyzico’nun güvenli ödeme sayfası üzerinden ödeme yapabilirsiniz. Kartınıza bağlı olarak 2, 3, 6 ve 9 taksit seçenekleri ödeme sayfasında gösterilir.',
       },
       { h3: 'Kart bilgilerim saklanıyor mu?' },
       { p: 'Hayır. Kart bilgileriniz yalnızca iyzico’nun ödeme sayfasına girilir; sitemizde saklanmaz.' },
-      { h3: 'İade veya değişim yapabilir miyim?' },
+      { h3: 'Üye olmadan sipariş verebilir miyim?' },
       {
-        p: 'Evet. Teslimattan itibaren 14 gün içinde iade edebilir, ürünü değiştirebilirsiniz. İade ve değişim kargo ücretlerini biz karşılarız. Ayrıntılar İade ve Değişim sayfasında.',
+        p: 'Evet. Giriş sayfasındaki “Müşteri olmadan devam et” ile sepete ekleyip ödeme yapabilirsiniz. Üye olursanız siparişlerinizi ve kargo takibini hesabınızdan görebilirsiniz.',
+      },
+      { h3: 'Değişim veya iade yapabilir miyim?' },
+      {
+        p: 'Evet. Teslimattan itibaren 14 gün içinde ürünü değiştirebilir veya iade edebilirsiniz. Kargo ücretlerini biz karşılarız. Ayrıntılar İade ve Değişim sayfasında.',
       },
       { h3: 'Siparişimi nasıl takip ederim?' },
       {
         p: 'Üye siparişlerinde takip numarası Hesabım › Siparişlerim sayfasında görünür. Üye olmadan verdiğiniz siparişler için sipariş numaranızla bize ulaşabilirsiniz.',
+      },
+      { h3: 'Toptan satış yapıyor musunuz?' },
+      {
+        p: `Evet. İmalatçı ve toptancıyız; toptan fiyat ve bayilik için ${COMPANY.phone} numaralı telefon veya WhatsApp hattımızdan bize ulaşın.`,
       },
       { h3: 'Ürünlerin malzemesi nedir?' },
       { p: 'Her ürünün malzemesi ve ölçüleri ürün sayfasında yazar.' },
@@ -170,7 +256,7 @@ export const PAGES: PageSeed[] = [
         p: 'Tarayıcı ayarlarınızdan çerezleri ve site verilerini silebilir veya engelleyebilirsiniz. Zorunlu çerezleri engellemeniz durumunda üye girişi ve sepet gibi özellikler çalışmayabilir.',
       },
       { h2: 'İletişim' },
-      { p: 'Sorularınız için İletişim sayfasındaki kanallardan bize ulaşabilirsiniz.' },
+      { p: `Sorularınız için ${COMPANY.phone} numaralı telefon veya WhatsApp hattımızdan bize ulaşabilirsiniz.` },
     ],
   },
   {
@@ -214,7 +300,7 @@ export const PAGES: PageSeed[] = [
   {
     slug: 'kvkk',
     title: 'KVKK Aydınlatma Metni',
-    publish: false,
+    publish: true,
     blocks: [
       {
         p: `6698 sayılı Kişisel Verilerin Korunması Kanunu (“KVKK”) uyarınca, veri sorumlusu sıfatıyla ${COMPANY.owner} (${COMPANY.brand}) olarak kişisel verilerinizi aşağıda açıklanan şekilde işliyoruz.`,
@@ -247,7 +333,7 @@ export const PAGES: PageSeed[] = [
       },
       { h2: 'Aktarım' },
       {
-        p: 'Kişisel verileriniz yalnızca yukarıdaki amaçlar için gerekli olduğu ölçüde şu taraflarla paylaşılır: ödeme kuruluşu (iyzico), kargo firması, yasal olarak yetkili kamu kurumları ve sitenin barındırma, veritabanı ve dosya depolama hizmetini sağlayan altyapı hizmet sağlayıcıları.',
+        p: `Kişisel verileriniz yalnızca yukarıdaki amaçlar için gerekli olduğu ölçüde şu taraflarla paylaşılır: ödeme kuruluşu (iyzico), kargo firması (${COMPANY.carrier}), yasal olarak yetkili kamu kurumları ve sitenin barındırma, veritabanı ve dosya depolama hizmetini sağlayan altyapı hizmet sağlayıcıları.`,
       },
       {
         p: 'Altyapı hizmet sağlayıcılarımızın sunucuları yurt dışında bulunabilir. Bu aktarımlar KVKK md. 9’da öngörülen güvencelere uygun olarak yapılır.',
@@ -261,14 +347,14 @@ export const PAGES: PageSeed[] = [
         p: 'KVKK md. 11 uyarınca; verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, işleme amacını öğrenme, aktarıldığı kişileri bilme, eksik veya yanlış işlenmişse düzeltilmesini, şartları oluştuğunda silinmesini veya yok edilmesini isteme, bu işlemlerin aktarılan kişilere bildirilmesini isteme, otomatik analiz sonucu aleyhinize bir sonuca itiraz etme ve kanuna aykırı işleme nedeniyle zarara uğramanız hâlinde zararın giderilmesini talep etme haklarına sahipsiniz.',
       },
       {
-        p: `Başvurularınızı ${COMPANY.email} adresine e-posta ile ya da ${COMPANY.address} adresine yazılı olarak iletebilirsiniz. Başvurunuz en geç 30 gün içinde ücretsiz olarak sonuçlandırılır.`,
+        p: `Başvurularınızı ${COMPANY.address} adresine yazılı olarak${COMPANY.email ? ` veya ${COMPANY.email} adresine e-posta ile` : ''} iletebilirsiniz. Başvurunuz en geç 30 gün içinde ücretsiz olarak sonuçlandırılır.`,
       },
     ],
   },
   {
     slug: 'gizlilik-politikasi',
     title: 'Gizlilik Politikası',
-    publish: false,
+    publish: true,
     blocks: [
       {
         p: `${COMPANY.brand} olarak gizliliğinize önem veriyoruz. Bu politika, sitemizi kullanırken hangi bilgileri topladığımızı ve bunları nasıl koruduğumuzu açıklar.`,
@@ -298,13 +384,13 @@ export const PAGES: PageSeed[] = [
         p: 'Kullandığımız çerezler Çerez Politikası’nda, kişisel verilerinize ilişkin haklarınız KVKK Aydınlatma Metni’nde açıklanmıştır.',
       },
       { h2: 'İletişim' },
-      { p: `${COMPANY.owner} – ${COMPANY.email} – ${COMPANY.phone}` },
+      sellerBlock,
     ],
   },
   {
     slug: 'on-bilgilendirme-formu',
     title: 'Ön Bilgilendirme Formu',
-    publish: false,
+    publish: true,
     blocks: [
       { h2: '1. Satıcı bilgileri' },
       sellerBlock,
@@ -318,21 +404,21 @@ export const PAGES: PageSeed[] = [
       },
       { h2: '4. Ödeme' },
       {
-        p: 'Ödeme, kredi kartı veya banka kartıyla iyzico güvenli ödeme sayfası üzerinden yapılır. Taksit seçenekleri kartınıza göre ödeme sayfasında gösterilir.',
+        p: 'Ödeme, kredi kartı veya banka kartıyla iyzico güvenli ödeme sayfası üzerinden yapılır. Taksit seçenekleri kartınıza göre ödeme sayfasında gösterilir. Kapıda ödeme seçeneği yoktur.',
       },
       { h2: '5. Teslimat' },
       {
-        p: 'Ürünler, sipariş formunda belirtilen teslimat adresine kargo ile gönderilir. Tahmini teslim süresi 2-4 iş günüdür; teslimat her durumda siparişten itibaren en geç 30 gün içinde yapılır.',
+        p: `Ürünler, sipariş formunda belirtilen teslimat adresine ${COMPANY.carrier} ile gönderilir. Tahmini teslim süresi 2-4 iş günüdür; teslimat her durumda siparişten itibaren en geç 30 gün içinde yapılır.`,
       },
       { h2: '6. Cayma hakkı' },
       {
         p: 'Ürünü teslim aldığınız günden itibaren 14 gün içinde hiçbir gerekçe göstermeden ve cezai şart ödemeden sözleşmeden cayabilirsiniz.',
       },
       {
-        p: `Cayma bildiriminizi bu süre içinde ${COMPANY.email} adresine e-posta göndererek, ${COMPANY.address} adresine yazılı olarak veya üye siparişlerinde Hesabım › Siparişlerim üzerinden iade talebi oluşturarak iletebilirsiniz.`,
+        p: `Cayma bildiriminizi bu süre içinde ${noticeChannels} veya üye siparişlerinde Hesabım › Siparişlerim üzerinden iade talebi oluşturarak iletebilirsiniz.`,
       },
       {
-        p: 'İade kargo ücreti satıcı tarafından karşılanır. Ürünü cayma bildiriminden itibaren 10 gün içinde geri göndermeniz gerekir. Ödediğiniz tutar, cayma bildiriminin ulaşmasından itibaren 14 gün içinde ödeme yaptığınız karta iade edilir.',
+        p: `İade kargo ücreti satıcı tarafından karşılanır; ürünü size iletilen ${COMPANY.carrier} anlaşmalı gönderi koduyla, cayma bildiriminden itibaren 10 gün içinde geri göndermeniz gerekir. Ödediğiniz tutar, cayma bildiriminin ulaşmasından itibaren 14 gün içinde ödeme yaptığınız karta iade edilir.`,
       },
       {
         p: 'Ürünün olağan kullanımı dışındaki kullanım nedeniyle oluşan değişiklik ve bozulmalardan alıcı sorumludur.',
@@ -350,7 +436,7 @@ export const PAGES: PageSeed[] = [
   {
     slug: 'mesafeli-satis-sozlesmesi',
     title: 'Mesafeli Satış Sözleşmesi',
-    publish: false,
+    publish: true,
     blocks: [
       { h2: '1. Taraflar' },
       { p: 'Satıcı:' },
@@ -364,21 +450,21 @@ export const PAGES: PageSeed[] = [
       },
       { h2: '3. Ürün, fiyat ve ödeme' },
       {
-        p: `Ürünlerin türü, adedi, KDV dahil satış fiyatı ve kargo ücreti ödeme sayfasındaki sipariş özetinde belirtildiği gibidir. ${FREE_LIMIT} ve üzeri siparişlerde kargo ücretsizdir; altında ${SHIPPING_FEE} kargo ücreti alınır. Ödeme, iyzico güvenli ödeme sayfası üzerinden kartla yapılır.`,
+        p: `Ürünlerin türü, adedi, KDV dahil satış fiyatı ve kargo ücreti ödeme sayfasındaki sipariş özetinde belirtildiği gibidir. ${FREE_LIMIT} ve üzeri siparişlerde kargo ücretsizdir; altında ${SHIPPING_FEE} kargo ücreti alınır. Ödeme, iyzico güvenli ödeme sayfası üzerinden kartla yapılır; kapıda ödeme yoktur.`,
       },
       { h2: '4. Teslimat' },
       {
-        p: 'Ürünler, sipariş formunda belirtilen adrese kargo ile teslim edilir. Teslimat, siparişin satıcıya ulaşmasından itibaren en geç 30 gün içinde yapılır. Satıcı bu süre içinde teslim edemezse alıcı sözleşmeyi feshedebilir; bu durumda ödenen tutar 14 gün içinde iade edilir.',
+        p: `Ürünler, sipariş formunda belirtilen adrese ${COMPANY.carrier} ile teslim edilir. Teslimat, siparişin satıcıya ulaşmasından itibaren en geç 30 gün içinde yapılır. Satıcı bu süre içinde teslim edemezse alıcı sözleşmeyi feshedebilir; bu durumda ödenen tutar 14 gün içinde iade edilir.`,
       },
       {
         p: 'Satıcı, stokta kalmaması gibi sebeplerle sipariş edilen ürünü teslim edemeyeceğini anlarsa alıcıyı bilgilendirir ve ödenen tutarı 14 gün içinde iade eder.',
       },
       { h2: '5. Cayma hakkı' },
       {
-        p: `Alıcı, ürünü teslim aldığı günden itibaren 14 gün içinde hiçbir gerekçe göstermeden ve cezai şart ödemeden sözleşmeden cayabilir. Cayma bildirimi ${COMPANY.email} adresine, ${COMPANY.address} adresine yazılı olarak veya üye siparişlerinde site üzerinden iade talebiyle yapılır.`,
+        p: `Alıcı, ürünü teslim aldığı günden itibaren 14 gün içinde hiçbir gerekçe göstermeden ve cezai şart ödemeden sözleşmeden cayabilir. Cayma bildirimi ${noticeChannels} veya üye siparişlerinde site üzerinden iade talebiyle yapılır.`,
       },
       {
-        p: 'Alıcı, cayma bildiriminden itibaren 10 gün içinde ürünü satıcıya geri gönderir; iade kargo ücreti satıcıya aittir. Satıcı, cayma bildiriminin kendisine ulaşmasından itibaren 14 gün içinde ödenen tutarı alıcının ödeme yaptığı karta iade eder.',
+        p: `Alıcı, cayma bildiriminden itibaren 10 gün içinde ürünü satıcıya geri gönderir; iade, satıcının ilettiği ${COMPANY.carrier} anlaşmalı gönderi koduyla yapılır ve kargo ücreti satıcıya aittir. Satıcı, cayma bildiriminin kendisine ulaşmasından itibaren 14 gün içinde ödenen tutarı alıcının ödeme yaptığı karta iade eder.`,
       },
       {
         p: 'Ürünün olağan kullanımı dışındaki kullanım nedeniyle oluşan değişiklik ve bozulmalardan alıcı sorumludur. Kişiye özel hazırlanan ürünlerde cayma hakkı kullanılamaz.',

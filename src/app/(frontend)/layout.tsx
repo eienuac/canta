@@ -7,6 +7,8 @@ import { ToastProvider } from '@/components/ui/toaster'
 import { SiteHeader } from '@/components/layout/site-header'
 import { SiteFooter } from '@/components/layout/site-footer'
 import { getHeaderCategories } from '@/services/products'
+import { getPayloadClient } from '@/lib/payload'
+import type { SiteSetting } from '@/payload-types'
 import { absoluteUrl } from '@/lib/utils'
 import '../globals.css'
 
@@ -73,6 +75,16 @@ async function safeCategories(): Promise<HeaderCategory[]> {
   }
 }
 
+async function safeSiteSettings(): Promise<SiteSetting | null> {
+  try {
+    const payload = await getPayloadClient()
+    return (await payload.findGlobal({ slug: 'site-settings', depth: 0 })) as SiteSetting
+  } catch (error) {
+    console.error('[RootLayout] Failed to load site settings:', error)
+    return null
+  }
+}
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // The CSP nonce is generated per request in proxy.ts, so every page must render per request.
   await connection()
@@ -84,6 +96,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     console.error('[RootLayout] Unexpected layout data error:', error)
     categories = []
   }
+  const settings = await safeSiteSettings()
 
   return (
     <html lang="tr">
@@ -92,7 +105,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <CartProvider>
             <SiteHeader categories={categories} />
             <main className="min-h-[70vh]">{children}</main>
-            <SiteFooter />
+            <SiteFooter
+              brandName={settings?.brandName || undefined}
+              tagline={settings?.tagline || undefined}
+              social={settings?.social}
+              phone={settings?.contactPhone}
+            />
             <ToastProvider />
           </CartProvider>
         </AuthProvider>
