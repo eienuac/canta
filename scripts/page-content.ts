@@ -439,7 +439,6 @@ export const PAGES: PageSeed[] = [
     publish: true,
     blocks: [
       { h2: '1. Taraflar' },
-      { p: 'Satıcı:' },
       sellerBlock,
       {
         p: 'Alıcı: Sipariş formunda adı, soyadı, iletişim ve teslimat bilgileri yer alan kişidir.',
