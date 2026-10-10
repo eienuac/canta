@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { useCart } from '@/hooks/use-cart'
 import { formatPrice } from '@/lib/utils'
+import { calculateShipping } from '@/services/shipping'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/product/product-card'
@@ -53,7 +54,10 @@ export default function CartPage() {
     )
   }
 
-  const shippingEstimate = subtotal - discount >= 3000 ? 0 : 79.9
+  const shippingEstimate = calculateShipping({
+    method: 'standard',
+    subtotal: Math.max(0, subtotal - discount),
+  }).cost
   const total = Math.max(0, subtotal - discount + shippingEstimate)
 
   return (

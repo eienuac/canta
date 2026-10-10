@@ -29,7 +29,7 @@ export const checkoutSchema = z.object({
   cartId: z.string().uuid(),
   guestToken: z.string().min(8).optional().nullable(),
   userId: z.string().uuid().optional().nullable(),
-  shippingMethod: z.enum(['standard', 'express']).default('standard'),
+  shippingMethod: z.literal('standard').default('standard'),
   address: checkoutAddressSchema,
   couponCode: z.string().optional().nullable(),
   idempotencyKey: z.string().min(8),

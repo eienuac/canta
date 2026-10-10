@@ -8,6 +8,7 @@ import { useCart } from '@/hooks/use-cart'
 import { useAuth } from '@/hooks/use-auth'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice } from '@/lib/utils'
+import { calculateShipping, FREE_SHIPPING_THRESHOLD } from '@/services/shipping'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 
@@ -30,11 +31,7 @@ export default function CheckoutPage() {
   const { user, loading: authLoading } = useAuth()
   const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
-  const [shippingMethod, setShippingMethod] = useState<'standard' | 'express'>('standard')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
-  const [shippingQuotes, setShippingQuotes] = useState<
-    Array<{ method: 'standard' | 'express'; label: string; cost: number; eta: string }>
-  >([])
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -53,28 +50,13 @@ export default function CheckoutPage() {
     }
   }, [user?.email, form.email])
 
-  useEffect(() => {
-    const payable = Math.max(0, subtotal - discount)
-    fetch(`/api/shipping/quote?subtotal=${payable}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (Array.isArray(d.methods)) setShippingQuotes(d.methods)
-      })
-      .catch(() => null)
-  }, [subtotal, discount])
-
   // Do NOT call refresh() on mount — CartProvider already owns cart state.
   // A remount refresh was wiping a full cart with an empty user cart (~2s later).
 
-  const selectedShipping =
-    shippingQuotes.find((m) => m.method === shippingMethod) ||
-    (shippingMethod === 'express'
-      ? { cost: 149.9, label: 'Hızlı Kargo', eta: '1-2 iş günü' }
-      : {
-          cost: Math.max(0, subtotal - discount) >= 3000 ? 0 : 79.9,
-          label: 'Standart Kargo',
-          eta: '2-4 iş günü',
-        })
+  const selectedShipping = calculateShipping({
+    method: 'standard',
+    subtotal: Math.max(0, subtotal - discount),
+  })
   const shippingCost = selectedShipping.cost
   const total = Math.max(0, subtotal - discount + shippingCost)
   const bootstrapping = authLoading || cartLoading
@@ -143,7 +125,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           cartId,
           guestToken: user ? undefined : guestToken || undefined,
-          shippingMethod,
+          shippingMethod: selectedShipping.method,
           address: form,
           couponCode: couponCode || undefined,
           acceptedTerms,
@@ -153,7 +135,7 @@ export default function CheckoutPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Sipariş oluşturulamadı')
       if (data.paymentPageUrl) {
-        window.location.href = data.paymentPageUrl
+        window.location.assign(data.paymentPageUrl)
         return
       }
       toast.error('Ödeme sağlayıcısı yapılandırılmamış (PAYMENT_API_KEY / PAYMENT_SECRET_KEY)')
@@ -246,40 +228,18 @@ export default function CheckoutPage() {
 
           {step === 2 && (
             <div className="space-y-3">
-              {(shippingQuotes.length
-                ? shippingQuotes
-                : [
-                    {
-                      method: 'standard' as const,
-                      label: 'Standart Kargo',
-                      cost: Math.max(0, subtotal - discount) >= 3000 ? 0 : 79.9,
-                      eta: '2-4 iş günü',
-                    },
-                    {
-                      method: 'express' as const,
-                      label: 'Hızlı Kargo',
-                      cost: 149.9,
-                      eta: '1-2 iş günü',
-                    },
-                  ]
-              ).map((m) => (
-                <button
-                  key={m.method}
-                  type="button"
-                  onClick={() => setShippingMethod(m.method)}
-                  className={`flex w-full items-center justify-between border px-4 py-4 text-left ${
-                    shippingMethod === m.method ? 'border-espresso bg-ivory' : 'border-border'
-                  }`}
-                >
-                  <span>
-                    <span className="block text-sm text-espresso">{m.label}</span>
-                    <span className="text-xs text-muted">{m.eta}</span>
-                  </span>
-                  <span className="text-sm">
-                    {m.cost === 0 ? 'Ücretsiz' : formatPrice(m.cost)}
-                  </span>
-                </button>
-              ))}
+              <div className="flex w-full items-center justify-between border border-espresso bg-ivory px-4 py-4">
+                <span>
+                  <span className="block text-sm text-espresso">{selectedShipping.label}</span>
+                  <span className="text-xs text-muted">{selectedShipping.eta}</span>
+                </span>
+                <span className="text-sm">
+                  {selectedShipping.cost === 0 ? 'Ücretsiz' : formatPrice(selectedShipping.cost)}
+                </span>
+              </div>
+              <p className="text-xs text-muted">
+                {formatPrice(FREE_SHIPPING_THRESHOLD)} ve üzeri siparişlerde kargo ücretsizdir.
+              </p>
             </div>
           )}
 

@@ -38,7 +38,7 @@ const FALLBACK: Record<string, { title: string; body: string }> = {
   magazalar: { title: 'Mağazalar', body: PENDING },
   'kargo-ve-teslimat': {
     title: 'Kargo ve Teslimat',
-    body: 'Siparişler 2-4 iş günü içinde kargoya verilir. 3000 TL ve üzeri siparişlerde kargo ücretsizdir.',
+    body: 'Siparişler 2-4 iş günü içinde kargoya verilir. 1.500 TL ve üzeri siparişlerde kargo ücretsizdir, altındaki siparişlerde kargo ücreti 150 TL’dir.',
   },
   'iade-ve-degisim': {
     title: 'İade ve Değişim',

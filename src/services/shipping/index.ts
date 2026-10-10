@@ -1,7 +1,7 @@
 /**
  * Shipping abstraction — manual rates now; swap for cargo API later.
  */
-export type ShippingMethod = 'standard' | 'express'
+export type ShippingMethod = 'standard'
 
 export type ShippingQuote = {
   method: ShippingMethod
@@ -10,22 +10,14 @@ export type ShippingQuote = {
   eta: string
 }
 
-const FREE_SHIPPING_THRESHOLD = 3000
+export const FREE_SHIPPING_THRESHOLD = 1500
+export const STANDARD_SHIPPING_COST = 150
 
 export function calculateShipping(input: {
   method: ShippingMethod
   subtotal: number
 }): ShippingQuote {
-  if (input.method === 'express') {
-    return {
-      method: 'express',
-      label: 'Hızlı Kargo',
-      cost: 149.9,
-      eta: '1-2 iş günü',
-    }
-  }
-
-  const cost = input.subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : 79.9
+  const cost = input.subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_COST
   return {
     method: 'standard',
     label: 'Standart Kargo',
@@ -35,10 +27,7 @@ export function calculateShipping(input: {
 }
 
 export function listShippingMethods(subtotal: number): ShippingQuote[] {
-  return [
-    calculateShipping({ method: 'standard', subtotal }),
-    calculateShipping({ method: 'express', subtotal }),
-  ]
+  return [calculateShipping({ method: 'standard', subtotal })]
 }
 
 export interface ShippingProvider {

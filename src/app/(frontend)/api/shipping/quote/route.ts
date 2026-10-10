@@ -11,7 +11,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const body = z
     .object({
-      method: z.enum(['standard', 'express']).default('standard'),
+      method: z.literal('standard').default('standard'),
       subtotal: z.number().nonnegative(),
     })
     .parse(await request.json())
