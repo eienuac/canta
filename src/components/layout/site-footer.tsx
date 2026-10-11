@@ -97,8 +97,13 @@ export function SiteFooter({
       </div>
 
       <div className="border-t border-border">
-        <div className="container-page py-8">
+        <div className="container-page flex flex-col gap-4 py-8 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted">© {new Date().getFullYear()} {brandName}. Tüm hakları saklıdır.</p>
+          <img
+            src="/payments/iyzico-logo-band.svg"
+            alt="iyzico ile Öde, Visa, Mastercard, American Express ve Troy"
+            className="h-8 w-auto max-w-full"
+          />
         </div>
       </div>
     </footer>

@@ -245,6 +245,11 @@ export default function CheckoutPage() {
 
           {step >= 3 && (
             <div className="space-y-3 border border-border bg-ivory p-6 text-sm text-muted">
+              <img
+                src="/payments/iyzico-ile-ode.svg"
+                alt="iyzico ile Öde"
+                className="h-8 w-auto"
+              />
               <p>
                 Kart bilgileri iyzico’nun ödeme sayfasında alınır. Bu sitede kart bilgisi
                 saklanmaz.
