@@ -75,6 +75,13 @@ export const PAGES: PageSeed[] = [
     title: 'İletişim',
     publish: true,
     blocks: [
+      { h2: 'Satıcı' },
+      {
+        ul: [
+          `${COMPANY.owner} (${COMPANY.brand}, ${COMPANY.type})`,
+          `Vergi dairesi / no: ${COMPANY.taxOffice} / ${COMPANY.taxNo}`,
+        ],
+      },
       { h2: 'Telefon ve WhatsApp' },
       {
         parts: [

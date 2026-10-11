@@ -138,7 +138,7 @@ export default function CheckoutPage() {
         window.location.assign(data.paymentPageUrl)
         return
       }
-      toast.error('Ödeme sağlayıcısı yapılandırılmamış (PAYMENT_API_KEY / PAYMENT_SECRET_KEY)')
+      toast.error('Ödeme sayfası şu anda açılamadı. Lütfen tekrar deneyin.')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Hata')
     } finally {
@@ -246,13 +246,8 @@ export default function CheckoutPage() {
           {step >= 3 && (
             <div className="space-y-3 border border-border bg-ivory p-6 text-sm text-muted">
               <p>
-                Kart bilgileri ödeme sağlayıcısı (iyzico) sayfasında güvenle alınır. Bu sitede kart
-                saklanmaz. Ödeme yalnızca provider doğrulaması sonrası tamamlanır.
-              </p>
-              <p className="text-xs">
-                Sandbox test (başarılı):{' '}
-                <span className="font-mono text-espresso">5528790000000008</span> — SKT gelecek tarih,
-                CVC 123. <span className="font-mono">4111…</span> kartları bilerek hata üretir.
+                Kart bilgileri iyzico’nun ödeme sayfasında alınır. Bu sitede kart bilgisi
+                saklanmaz.
               </p>
             </div>
           )}
