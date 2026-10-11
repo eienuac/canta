@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { RichText } from '@payloadcms/richtext-lexical/react'
 import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
@@ -42,11 +43,6 @@ export default async function ProductDetailPage({ params }: Props) {
   const { slug } = await params
   const product = await getProductBySlug(slug).catch(() => null)
   if (!product) notFound()
-
-  const [related, reviews] = await Promise.all([
-    getRelatedProducts(product.id).catch(() => []),
-    listApprovedSafe(product.id),
-  ])
 
   const dimensions = product.dimensions
     ? [product.dimensions.width, product.dimensions.height, product.dimensions.depth]
@@ -135,39 +131,62 @@ export default async function ProductDetailPage({ params }: Props) {
         </div>
       </section>
 
-      <section className="mt-16 border-t border-border pt-12">
-        <h2 className="font-display text-2xl text-espresso">Yorumlar</h2>
-        {reviews.length === 0 ? (
-          <p className="mt-4 text-sm text-muted">Henüz onaylı yorum yok.</p>
-        ) : (
-          <ul className="mt-6 space-y-6">
-            {reviews.map((r) => (
-              <li key={r.id} className="border-b border-border pb-6">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{r.rating}/5</span>
-                  {r.title && <span className="text-sm text-espresso">{r.title}</span>}
-                  {r.verified_purchase && (
-                    <span className="text-[10px] uppercase tracking-widest text-muted">Doğrulanmış alışveriş</span>
-                  )}
-                </div>
-                {r.comment && <p className="mt-2 text-sm text-muted">{r.comment}</p>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <Suspense fallback={null}>
+        <ReviewsSection productId={product.id} />
+      </Suspense>
 
-      {related.length > 0 && (
-        <section className="mt-16 border-t border-border pt-12">
-          <h2 className="font-display text-2xl text-espresso">Benzer ürünler</h2>
-          <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
-            {related.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </section>
-      )}
+      <Suspense fallback={null}>
+        <RelatedSection productId={product.id} categoryId={product.categoryId} />
+      </Suspense>
     </div>
+  )
+}
+
+async function ReviewsSection({ productId }: { productId: string }) {
+  const reviews = await listApprovedSafe(productId)
+  return (
+    <section className="mt-16 border-t border-border pt-12">
+      <h2 className="font-display text-2xl text-espresso">Yorumlar</h2>
+      {reviews.length === 0 ? (
+        <p className="mt-4 text-sm text-muted">Henüz onaylı yorum yok.</p>
+      ) : (
+        <ul className="mt-6 space-y-6">
+          {reviews.map((r) => (
+            <li key={r.id} className="border-b border-border pb-6">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">{r.rating}/5</span>
+                {r.title && <span className="text-sm text-espresso">{r.title}</span>}
+                {r.verified_purchase && (
+                  <span className="text-[10px] uppercase tracking-widest text-muted">Doğrulanmış alışveriş</span>
+                )}
+              </div>
+              {r.comment && <p className="mt-2 text-sm text-muted">{r.comment}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+async function RelatedSection({
+  productId,
+  categoryId,
+}: {
+  productId: string
+  categoryId: string | number | null
+}) {
+  const related = await getRelatedProducts(productId, 4, categoryId).catch(() => [])
+  if (related.length === 0) return null
+  return (
+    <section className="mt-16 border-t border-border pt-12">
+      <h2 className="font-display text-2xl text-espresso">Benzer ürünler</h2>
+      <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
+        {related.map((p) => (
+          <ProductCard key={p.id} product={p} />
+        ))}
+      </div>
+    </section>
   )
 }
 

@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import type { Payload, Where } from 'payload'
 import { unstable_cache } from 'next/cache'
 import { getPayloadClient } from '@/lib/payload'
@@ -212,7 +213,26 @@ export async function listProducts(filters: ProductFilters) {
   }
 }
 
-export async function getProductBySlug(slug: string): Promise<ProductDetailDTO | null> {
+async function loadProductRating(productId: string) {
+  try {
+    const { getSupabaseAdmin } = await import('@/lib/supabase/admin')
+    const supabase = getSupabaseAdmin()
+    const { data } = await supabase
+      .from('reviews')
+      .select('rating')
+      .eq('product_id', productId)
+      .eq('is_approved', true)
+    if (!data || data.length === 0) return { ratingAverage: null as number | null, ratingCount: 0 }
+    return {
+      ratingAverage: data.reduce((s, r) => s + r.rating, 0) / data.length,
+      ratingCount: data.length,
+    }
+  } catch {
+    return { ratingAverage: null as number | null, ratingCount: 0 }
+  }
+}
+
+export const getProductBySlug = cache(async (slug: string): Promise<ProductDetailDTO | null> => {
   const payload = await getPayloadClient()
   const result = await payload.find({
     collection: 'products',
@@ -223,7 +243,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailDTO |
         { isActive: { equals: true } },
       ],
     },
-    depth: 2,
+    depth: 1,
     limit: 1,
     draft: false,
     ...queryOpts,
@@ -232,7 +252,10 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailDTO |
   const product = result.docs[0] as Product | undefined
   if (!product) return null
 
-  const stock = await stockMapForProducts([product])
+  const [stock, rating] = await Promise.all([
+    stockMapForProducts([product]),
+    loadProductRating(String(product.id)),
+  ])
   const card = mapCard(product, productInStock(product, stock))
 
   const images =
@@ -276,23 +299,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailDTO |
           },
         ]
 
-  let ratingAverage: number | null = null
-  let ratingCount = 0
-  try {
-    const { getSupabaseAdmin } = await import('@/lib/supabase/admin')
-    const supabase = getSupabaseAdmin()
-    const { data } = await supabase
-      .from('reviews')
-      .select('rating')
-      .eq('product_id', String(product.id))
-      .eq('is_approved', true)
-    if (data && data.length > 0) {
-      ratingCount = data.length
-      ratingAverage = data.reduce((s, r) => s + r.rating, 0) / data.length
-    }
-  } catch {
-    // optional
-  }
+  const { ratingAverage, ratingCount } = rating
 
   const og =
     product.seo?.ogImage && typeof product.seo.ogImage !== 'number'
@@ -313,6 +320,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailDTO |
     shippingInfo: product.shippingInfo ?? null,
     returnInfo: product.returnInfo ?? null,
     images: images as ProductDetailDTO['images'],
+    categoryId: relationId(product.category),
     variants,
     seo: {
       title: product.seo?.title || product.name,
@@ -323,22 +331,29 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailDTO |
     ratingAverage,
     ratingCount,
   }
-}
+})
 
-export async function getRelatedProducts(productId: string, limit = 4) {
+export async function getRelatedProducts(
+  productId: string,
+  limit = 4,
+  knownCategoryId?: string | number | null,
+) {
   const payload = await getPayloadClient()
-  const current = await payload
-    .findByID({
-      collection: 'products',
-      id: productId,
-      depth: 0,
-      ...queryOpts,
-    })
-    .catch(() => null)
+  let categoryId = knownCategoryId
+  if (categoryId === undefined) {
+    const current = await payload
+      .findByID({
+        collection: 'products',
+        id: productId,
+        depth: 0,
+        ...queryOpts,
+      })
+      .catch(() => null)
 
-  if (!current) return []
+    if (!current) return []
+    categoryId = relationId(current.category)
+  }
 
-  const categoryId = relationId(current.category)
   const and: Where[] = [
     { id: { not_equals: productId } },
     { _status: { equals: 'published' } },
@@ -351,7 +366,7 @@ export async function getRelatedProducts(productId: string, limit = 4) {
   const result = await payload.find({
     collection: 'products',
     where: { and },
-    depth: 2,
+    depth: 1,
     limit,
     draft: false,
     ...queryOpts,

@@ -61,6 +61,7 @@ export type ProductDetailDTO = ProductCardDTO & {
   shippingInfo: string | null
   returnInfo: string | null
   images: Array<{ url: string; alt: string; isPrimary: boolean }>
+  categoryId: string | number | null
   variants: Array<{
     id: string
     color?: string | null

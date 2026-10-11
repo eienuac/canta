@@ -32,6 +32,7 @@ export function ProductGallery({
           alt={current.alt || name}
           fill
           priority
+          unoptimized
           sizes="(max-width:1024px) 100vw, 50vw"
           className={cn('object-cover transition-transform duration-500', zoom && 'scale-150')}
         />
@@ -48,7 +49,7 @@ export function ProductGallery({
                 i === active ? 'border-espresso' : 'border-transparent'
               )}
             >
-              <Image src={img.url} alt="" fill className="object-cover" sizes="80px" />
+              <Image src={img.url} alt="" fill unoptimized className="object-cover" sizes="80px" />
             </button>
           ))}
         </div>

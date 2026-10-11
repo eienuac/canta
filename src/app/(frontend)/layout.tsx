@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { unstable_cache } from 'next/cache'
 import { connection } from 'next/server'
 import { Cormorant_Garamond, Manrope } from 'next/font/google'
 import { AuthProvider } from '@/hooks/use-auth'
@@ -75,10 +76,23 @@ async function safeCategories(): Promise<HeaderCategory[]> {
   }
 }
 
+const loadSiteSettings = unstable_cache(
+  async (): Promise<SiteSetting | null> => {
+    try {
+      const payload = await getPayloadClient()
+      return (await payload.findGlobal({ slug: 'site-settings', depth: 0 })) as SiteSetting
+    } catch (error) {
+      console.error('[RootLayout] Failed to load site settings:', error)
+      return null
+    }
+  },
+  ['site-settings'],
+  { revalidate: 120, tags: ['site-settings'] },
+)
+
 async function safeSiteSettings(): Promise<SiteSetting | null> {
   try {
-    const payload = await getPayloadClient()
-    return (await payload.findGlobal({ slug: 'site-settings', depth: 0 })) as SiteSetting
+    return await loadSiteSettings()
   } catch (error) {
     console.error('[RootLayout] Failed to load site settings:', error)
     return null
