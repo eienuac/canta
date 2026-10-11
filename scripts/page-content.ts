@@ -15,7 +15,7 @@ export const COMPANY = {
   instagramUrl: 'https://www.instagram.com/nuriseckincanta',
   mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Hisarpark%C4%B1+Caddesi+12%2FA+Alt%C4%B1nda%C4%9F+Ankara',
   email: 'seckincanta@hotmail.com',
-  site: 'canta-steel.vercel.app',
+  site: 'www.dericanta.store',
   carrier: 'MNG Kargo',
 }
 
