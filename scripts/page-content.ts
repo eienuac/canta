@@ -14,8 +14,7 @@ export const COMPANY = {
   instagram: 'nuriseckincanta',
   instagramUrl: 'https://www.instagram.com/nuriseckincanta',
   mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Hisarpark%C4%B1+Caddesi+12%2FA+Alt%C4%B1nda%C4%9F+Ankara',
-  /** Leave empty until there is a customer e-mail address; every e-mail mention is then omitted. */
-  email: '',
+  email: 'seckincanta@hotmail.com',
   site: 'canta-steel.vercel.app',
   carrier: 'MNG Kargo',
 }
@@ -207,9 +206,13 @@ export const PAGES: PageSeed[] = [
       {
         p: 'Evet. Giriş sayfasındaki “Müşteri olmadan devam et” ile sepete ekleyip ödeme yapabilirsiniz. Üye olursanız siparişlerinizi ve kargo takibini hesabınızdan görebilirsiniz.',
       },
-      { h3: 'Değişim veya iade yapabilir miyim?' },
+      { h3: '14 gün içinde iade edersem kargoyu kim öder?' },
       {
-        p: 'Evet. Teslimattan itibaren 14 gün içinde ürünü değiştirebilir veya iade edebilirsiniz. Kargo ücretlerini biz karşılarız. Ayrıntılar İade ve Değişim sayfasında.',
+        p: `İadenizi ${COMPANY.carrier} ile yaparsanız kargo ücretini biz karşılarız ve size anlaşmalı gönderi kodu veririz. Başka bir kargo firmasıyla gönderirseniz o ücret size aittir.`,
+      },
+      { h3: 'Değişimde kargo ücreti benden mi alınır?' },
+      {
+        p: 'Hayır. Renk veya model değişiminde hem bize gönderdiğiniz kargoyu hem de yeni ürünün size gelişini biz karşılarız.',
       },
       { h3: 'Siparişimi nasıl takip ederim?' },
       {
