@@ -124,6 +124,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               tagline={settings?.tagline || undefined}
               social={settings?.social}
               phone={settings?.contactPhone}
+              kep={settings?.contactKep}
             />
             <ToastProvider />
           </CartProvider>

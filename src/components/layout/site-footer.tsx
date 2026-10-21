@@ -29,11 +29,13 @@ export function SiteFooter({
   tagline = 'Zamansız deri.',
   social,
   phone,
+  kep,
 }: {
   brandName?: string
   tagline?: string
   social?: { instagram?: string | null; facebook?: string | null; pinterest?: string | null } | null
   phone?: string | null
+  kep?: string | null
 }) {
   const whatsapp = whatsappUrl(phone)
   return (
@@ -43,6 +45,7 @@ export function SiteFooter({
           <BrandLogo className="h-16 w-16 md:h-20 md:w-20" />
           <p className="sr-only">{brandName}</p>
           <p className="mt-3 max-w-xs text-sm text-muted">{tagline}</p>
+          {kep && <p className="mt-3 max-w-xs text-xs text-muted">KEP: {kep}</p>}
           <div className="mt-6 flex gap-4 text-sm text-espresso">
             {whatsapp && (
               <a href={whatsapp} target="_blank" rel="noreferrer">

@@ -15,6 +15,7 @@ export const COMPANY = {
   instagramUrl: 'https://www.instagram.com/nuriseckincanta',
   mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Hisarpark%C4%B1+Caddesi+12%2FA+Alt%C4%B1nda%C4%9F+Ankara',
   email: 'seckincanta@hotmail.com',
+  kep: 'aliselim.seckin@hs01.kep.tr',
   site: 'www.dericanta.store',
   carrier: 'MNG Kargo',
 }
@@ -34,6 +35,7 @@ export type Block =
 export type PageSeed = { slug: string; title: string; publish: boolean; blocks: Block[] }
 
 const emailLine = COMPANY.email ? [`E-posta: ${COMPANY.email}`] : []
+const kepLine = COMPANY.kep ? [`KEP: ${COMPANY.kep}`] : []
 
 const sellerBlock: Block = {
   ul: [
@@ -42,6 +44,7 @@ const sellerBlock: Block = {
     `Adres: ${COMPANY.address}`,
     `Telefon / WhatsApp: ${COMPANY.phone}`,
     ...emailLine,
+    ...kepLine,
     `İnternet sitesi: ${COMPANY.site}`,
   ],
 }
@@ -50,6 +53,7 @@ const sellerBlock: Block = {
 const noticeChannels = [
   `${COMPANY.phone} numaralı telefon / WhatsApp hattından`,
   ...(COMPANY.email ? [`${COMPANY.email} adresine e-posta göndererek`] : []),
+  ...(COMPANY.kep ? [`${COMPANY.kep} KEP adresine kayıtlı elektronik posta göndererek`] : []),
   `${COMPANY.address} adresine yazılı olarak`,
 ].join(', ')
 
@@ -90,6 +94,7 @@ export const PAGES: PageSeed[] = [
         ],
       },
       ...(COMPANY.email ? [{ h2: 'E-posta' } as Block, { p: COMPANY.email } as Block] : []),
+      ...(COMPANY.kep ? [{ h2: 'KEP' } as Block, { p: COMPANY.kep } as Block] : []),
       { h2: 'Adres' },
       { parts: [`${COMPANY.address} — `, { text: 'Haritada aç', url: COMPANY.mapsUrl }] },
       { h2: 'Instagram' },
@@ -357,7 +362,7 @@ export const PAGES: PageSeed[] = [
         p: 'KVKK md. 11 uyarınca; verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, işleme amacını öğrenme, aktarıldığı kişileri bilme, eksik veya yanlış işlenmişse düzeltilmesini, şartları oluştuğunda silinmesini veya yok edilmesini isteme, bu işlemlerin aktarılan kişilere bildirilmesini isteme, otomatik analiz sonucu aleyhinize bir sonuca itiraz etme ve kanuna aykırı işleme nedeniyle zarara uğramanız hâlinde zararın giderilmesini talep etme haklarına sahipsiniz.',
       },
       {
-        p: `Başvurularınızı ${COMPANY.address} adresine yazılı olarak${COMPANY.email ? ` veya ${COMPANY.email} adresine e-posta ile` : ''} iletebilirsiniz. Başvurunuz en geç 30 gün içinde ücretsiz olarak sonuçlandırılır.`,
+        p: `Başvurularınızı ${COMPANY.address} adresine yazılı olarak${COMPANY.email ? `, ${COMPANY.email} adresine e-posta ile` : ''}${COMPANY.kep ? ` veya ${COMPANY.kep} KEP adresine` : ''} iletebilirsiniz. Başvurunuz en geç 30 gün içinde ücretsiz olarak sonuçlandırılır.`,
       },
     ],
   },

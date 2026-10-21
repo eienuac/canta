@@ -128,6 +128,7 @@ export interface SiteSetting {
   tagline?: string | null
   contactEmail?: string | null
   contactPhone?: string | null
+  contactKep?: string | null
   social?: {
     instagram?: string | null
     facebook?: string | null

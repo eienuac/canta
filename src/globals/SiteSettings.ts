@@ -33,6 +33,11 @@ export const SiteSettings: GlobalConfig = {
       label: 'Telefon',
     },
     {
+      name: 'contactKep',
+      type: 'email',
+      label: 'KEP adresi',
+    },
+    {
       name: 'social',
       type: 'group',
       label: 'Sosyal medya',
