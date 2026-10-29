@@ -1,7 +1,7 @@
+import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
-const src =
-  'C:/Users/ulase/.cursor/projects/c-Users-ulase-repolar-canta/assets/c__Users_ulase_AppData_Roaming_Cursor_User_workspaceStorage_31dced96b6aeb84ebc05dbac2fc6d7bd_images_image-caf28cbe-cb53-45fc-b66d-938ad450693b.png'
+const src = fileURLToPath(new URL('../public/brand/nuri-seckin-mark.jpg', import.meta.url))
 
 const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
 let minX = info.width
@@ -11,7 +11,7 @@ let maxY = 0
 for (let y = 0; y < info.height; y++) {
   for (let x = 0; x < info.width; x++) {
     const i = (y * info.width + x) * 4
-    if (data[i] < 235 || data[i + 1] < 235 || data[i + 2] < 235) {
+    if (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245) {
       if (x < minX) minX = x
       if (y < minY) minY = y
       if (x > maxX) maxX = x
@@ -20,22 +20,18 @@ for (let y = 0; y < info.height; y++) {
   }
 }
 
-const pad = 2
+const pad = 8
 const left = Math.max(0, minX - pad)
 const top = Math.max(0, minY - pad)
 const width = Math.min(info.width - left, maxX - minX + 1 + pad * 2)
 const height = Math.min(info.height - top, maxY - minY + 1 + pad * 2)
 
-const logo = await sharp(src)
-  .extract({ left, top, width, height })
-  .resize(Math.round(width * 12), Math.round(height * 12), { kernel: 'lanczos3' })
-  .png()
-  .toBuffer()
+const cropped = await sharp(src).extract({ left, top, width, height }).png().toBuffer()
 
-const size = 640
-const maxLogo = Math.round(size * 0.72)
-const fitted = await sharp(logo)
-  .resize({ width: maxLogo, height: maxLogo, fit: 'inside' })
+const size = 1024
+const maxLogo = Math.round(size * 0.84)
+const fitted = await sharp(cropped)
+  .resize({ width: maxLogo, height: maxLogo, fit: 'inside', kernel: 'lanczos3' })
   .png()
   .toBuffer()
 const fittedMeta = await sharp(fitted).metadata()

@@ -19,8 +19,8 @@ export function BrandLogo({ className, priority, href = '/' }: BrandLogoProps) {
       <Image
         src="/brand/nuri-seckin-logo.png"
         alt="Nuri Seçkin"
-        width={640}
-        height={640}
+        width={1024}
+        height={1024}
         priority={priority}
         className="h-full w-full object-cover"
       />
