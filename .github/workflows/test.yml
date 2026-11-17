@@ -52,11 +52,13 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Lifecycle scripts are not needed for typecheck/tests (only esbuild and
+      # unrs-resolver define postinstall verifiers), so they are not executed.
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Typecheck
-        run: npx tsc --noEmit -p tsconfig.json
+        run: npm run typecheck
 
       - name: Tests
         run: npm test
