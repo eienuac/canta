@@ -162,6 +162,15 @@ export async function getAvailableStock(sku: string): Promise<number> {
   return cmsStock
 }
 
+/**
+ * Stock changes go exclusively through the atomic inventory RPCs (supabase/migrations/002).
+ * There is deliberately no client-side fallback: a non-atomic read-modify-write could
+ * oversell under concurrency, so an RPC failure fails the operation instead.
+ */
+function inventoryRpcError(fn: string, sku: string, error: { message?: string }) {
+  return new Error(`${fn} failed for ${sku}: ${error.message ?? 'unknown error'}`)
+}
+
 export async function reserveStock(sku: string, qty: number, idempotencyKey: string): Promise<boolean> {
   const { getSupabaseAdmin } = await import('@/lib/supabase/admin')
   const supabase = getSupabaseAdmin()
@@ -170,44 +179,8 @@ export async function reserveStock(sku: string, qty: number, idempotencyKey: str
     p_qty: qty,
     p_idempotency_key: idempotencyKey,
   })
-  if (!error) return Boolean(data)
-
-  // Fallback when RPC missing from schema cache
-  const { data: existing } = await supabase
-    .from('inventory_ledger')
-    .select('id')
-    .eq('idempotency_key', idempotencyKey)
-    .maybeSingle()
-  if (existing) return true
-
-  const { data: row } = await supabase
-    .from('inventory')
-    .select('id, quantity, reserved_quantity')
-    .eq('sku', sku)
-    .maybeSingle()
-  if (!row) return false
-
-  const available = (row.quantity ?? 0) - (row.reserved_quantity ?? 0)
-  if (available < qty) return false
-
-  const { error: updErr } = await supabase
-    .from('inventory')
-    .update({
-      reserved_quantity: (row.reserved_quantity ?? 0) + qty,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('sku', sku)
-    .eq('reserved_quantity', row.reserved_quantity ?? 0)
-  if (updErr) throw updErr
-
-  const { error: ledErr } = await supabase.from('inventory_ledger').insert({
-    sku,
-    delta: qty,
-    reason: 'reserve',
-    idempotency_key: idempotencyKey,
-  })
-  if (ledErr && !/duplicate|unique/i.test(ledErr.message)) throw ledErr
-  return true
+  if (error) throw inventoryRpcError('reserve_inventory', sku, error)
+  return Boolean(data)
 }
 
 export async function commitStock(
@@ -224,41 +197,8 @@ export async function commitStock(
     p_order_id: orderId,
     p_idempotency_key: idempotencyKey,
   })
-  if (!error) return Boolean(data)
-
-  const { data: existing } = await supabase
-    .from('inventory_ledger')
-    .select('id')
-    .eq('idempotency_key', idempotencyKey)
-    .maybeSingle()
-  if (existing) return true
-
-  const { data: row } = await supabase
-    .from('inventory')
-    .select('id, quantity, reserved_quantity')
-    .eq('sku', sku)
-    .maybeSingle()
-  if (!row || (row.quantity ?? 0) < qty) return false
-
-  const { error: updErr } = await supabase
-    .from('inventory')
-    .update({
-      quantity: (row.quantity ?? 0) - qty,
-      reserved_quantity: Math.max((row.reserved_quantity ?? 0) - qty, 0),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('sku', sku)
-  if (updErr) throw updErr
-
-  const { error: ledErr } = await supabase.from('inventory_ledger').insert({
-    sku,
-    order_id: orderId,
-    delta: -qty,
-    reason: 'commit',
-    idempotency_key: idempotencyKey,
-  })
-  if (ledErr && !/duplicate|unique/i.test(ledErr.message)) throw ledErr
-  return true
+  if (error) throw inventoryRpcError('commit_inventory', sku, error)
+  return Boolean(data)
 }
 
 /** Undo a prior reserve (payment failure / checkout abort). Idempotent. */
@@ -272,38 +212,8 @@ export async function releaseStock(sku: string, qty: number, idempotencyKey: str
     p_idempotency_key: idempotencyKey,
   })
 
-  if (!error) return Boolean(data)
-
-  // Fallback when RPC not yet migrated — still idempotent via ledger
-  const { data: existing } = await supabase
-    .from('inventory_ledger')
-    .select('id')
-    .eq('idempotency_key', idempotencyKey)
-    .maybeSingle()
-  if (existing) return true
-
-  const { data: row } = await supabase
-    .from('inventory')
-    .select('id, reserved_quantity')
-    .eq('sku', sku)
-    .maybeSingle()
-  if (!row) return false
-
-  const nextReserved = Math.max((row.reserved_quantity ?? 0) - qty, 0)
-  const { error: updErr } = await supabase
-    .from('inventory')
-    .update({ reserved_quantity: nextReserved, updated_at: new Date().toISOString() })
-    .eq('sku', sku)
-  if (updErr) throw updErr
-
-  const { error: ledErr } = await supabase.from('inventory_ledger').insert({
-    sku,
-    delta: -qty,
-    reason: 'release',
-    idempotency_key: idempotencyKey,
-  })
-  if (ledErr && !/duplicate|unique/i.test(ledErr.message)) throw ledErr
-  return true
+  if (error) throw inventoryRpcError('release_inventory', sku, error)
+  return Boolean(data)
 }
 
 /**

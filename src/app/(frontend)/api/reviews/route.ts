@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createReview, listApprovedReviews } from '@/services/reviews'
-import { getErrorMessage } from '@/lib/errors'
+import { getErrorMessage, publicErrorMessage } from '@/lib/errors'
 import { rateLimit, clientIp } from '@/lib/rate-limit'
 
 export async function GET(request: Request) {
@@ -51,6 +51,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ review })
   } catch (e) {
-    return NextResponse.json({ error: getErrorMessage(e, 'Yorum eklenemedi') }, { status: 400 })
+    console.error('[POST /api/reviews]', getErrorMessage(e, 'Yorum eklenemedi'))
+    return NextResponse.json({ error: publicErrorMessage(e, 'Yorum eklenemedi') }, { status: 400 })
   }
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PublicError } from '@/lib/errors'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 const MAX_REQUESTS_PER_ORDER = 3
@@ -52,15 +53,15 @@ export async function createReturnRequest(input: z.infer<typeof createReturnSche
     .eq('user_id', data.userId)
     .single()
 
-  if (!order) throw new Error('Sipariş bulunamadı')
+  if (!order) throw new PublicError('Sipariş bulunamadı')
   if (order.status !== 'delivered') {
-    throw new Error('Yalnızca teslim edilmiş siparişler için iade açılabilir')
+    throw new PublicError('Yalnızca teslim edilmiş siparişler için iade açılabilir')
   }
 
   // Each order item may appear once, must belong to this order and the requested
   // quantity must not exceed what was bought minus what is already being returned.
   const ids = data.items.map((i) => i.orderItemId)
-  if (new Set(ids).size !== ids.length) throw new Error('Aynı ürün birden fazla kez eklenemez')
+  if (new Set(ids).size !== ids.length) throw new PublicError('Aynı ürün birden fazla kez eklenemez')
 
   const { data: orderItems } = await supabase
     .from('order_items')
@@ -68,7 +69,7 @@ export async function createReturnRequest(input: z.infer<typeof createReturnSche
     .eq('order_id', data.orderId)
   const bought = new Map((orderItems ?? []).map((oi) => [oi.id, oi.quantity]))
   for (const item of data.items) {
-    if (!bought.has(item.orderItemId)) throw new Error('Geçersiz sipariş kalemi')
+    if (!bought.has(item.orderItemId)) throw new PublicError('Geçersiz sipariş kalemi')
   }
 
   const { data: priorRequests } = await supabase
@@ -76,7 +77,7 @@ export async function createReturnRequest(input: z.infer<typeof createReturnSche
     .select('id, status')
     .eq('order_id', data.orderId)
   if ((priorRequests ?? []).length >= MAX_REQUESTS_PER_ORDER) {
-    throw new Error('Bu sipariş için iade talebi sınırına ulaşıldı')
+    throw new PublicError('Bu sipariş için iade talebi sınırına ulaşıldı')
   }
 
   const activeIds = (priorRequests ?? []).filter((r) => r.status !== 'rejected').map((r) => r.id)
@@ -92,7 +93,7 @@ export async function createReturnRequest(input: z.infer<typeof createReturnSche
   }
   for (const item of data.items) {
     const left = (bought.get(item.orderItemId) ?? 0) - (alreadyReturned.get(item.orderItemId) ?? 0)
-    if (item.quantity > left) throw new Error('İade miktarı satın alınan miktarı aşıyor')
+    if (item.quantity > left) throw new PublicError('İade miktarı satın alınan miktarı aşıyor')
   }
 
   const { data: request, error } = await supabase
@@ -107,7 +108,7 @@ export async function createReturnRequest(input: z.infer<typeof createReturnSche
     .select('*')
     .single()
 
-  if (error || !request) throw error || new Error('İade talebi oluşturulamadı')
+  if (error || !request) throw error || new PublicError('İade talebi oluşturulamadı')
 
   const items = data.items.map((item) => ({
     return_request_id: request.id,

@@ -5,7 +5,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { mergeGuestCartIntoUser } from '@/services/cart'
 import { ensureUserProfile, mergeGuestFavorites } from '@/services/favorites'
-import { getErrorMessage } from '@/lib/errors'
+import { getErrorMessage, publicErrorMessage } from '@/lib/errors'
 import type { Database } from '@/types/database'
 
 async function resolveAuthUser(request: Request) {
@@ -66,8 +66,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (e) {
-    const message = getErrorMessage(e, 'Merge failed')
-    console.error('[POST /api/cart/merge]', message, e)
-    return NextResponse.json({ error: message }, { status: 400 })
+    console.error('[POST /api/cart/merge]', getErrorMessage(e, 'Merge failed'), e)
+    return NextResponse.json({ error: publicErrorMessage(e, 'Sepet birleştirilemedi') }, { status: 400 })
   }
 }

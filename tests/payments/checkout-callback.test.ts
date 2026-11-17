@@ -117,7 +117,7 @@ describe('M1: legitimate results still work', () => {
 
     const res = await GET(callbackGetRequest('tok-1'))
 
-    expect(location(res)).toMatch(new RegExp(`/checkout/success\\?orderId=${o.id}&t=[0-9a-f]{32}`))
+    expect(location(res)).toMatch(new RegExp(`/checkout/success\\?orderId=${o.id}&t=\\d{13}\\.[0-9a-f]{32}`))
     expect(order(o.id)).toMatchObject({ status: 'payment_received', payment_status: 'paid' })
     expect(stock(o.sku)).toMatchObject({ quantity: 4, reserved_quantity: 0 })
   })

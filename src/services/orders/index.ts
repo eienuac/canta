@@ -1,4 +1,5 @@
 import { nanoid } from 'nanoid'
+import { PublicError } from '@/lib/errors'
 import { z } from 'zod'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { assertCartAccess, getCartWithProducts } from '@/services/cart'
@@ -80,7 +81,7 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
     .maybeSingle()
   if (existing) {
     if (existing.cart_id !== data.cartId) {
-      throw new Error('Geçersiz sipariş isteği')
+      throw new PublicError('Geçersiz sipariş isteği')
     }
     if (existing.payment_status === 'paid') {
       return { order: existing, payment: null, reused: true as const }
@@ -146,11 +147,11 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
 
   const cart = await getCartWithProducts(data.cartId)
   if (!cart.items.length) {
-    throw new Error('Sepet boş')
+    throw new PublicError('Sepet boş')
   }
   if (cart.checkoutBlocked || cart.hasStockIssues) {
     const bad = cart.items.filter((i) => i.stockStatus !== 'ok').map((i) => i.name)
-    throw new Error(
+    throw new PublicError(
       bad.length
         ? `Sepetinizde stok sorunu var: ${bad.join(', ')}`
         : 'Sepetinizde stok sorunu var'
@@ -168,7 +169,7 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
         `${data.idempotencyKey}:reserve:${item.sku}`
       )
       if (!ok) {
-        throw new Error(`${item.name} için yeterli stok yok`)
+        throw new PublicError(`${item.name} için yeterli stok yok`)
       }
       reserved.push({ sku: item.sku, quantity: item.quantity })
     }
@@ -185,7 +186,7 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
         userId: data.userId,
         guestEmail: data.address.email,
       })
-      if (!coupon.valid) throw new Error(coupon.error)
+      if (!coupon.valid) throw new PublicError(coupon.error)
       discountTotal = coupon.discount
       couponCode = coupon.coupon.code
     }
@@ -222,7 +223,7 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
       .select('*')
       .single()
 
-    if (error || !order) throw error || new Error('Sipariş oluşturulamadı')
+    if (error || !order) throw error || new PublicError('Sipariş oluşturulamadı')
     createdOrderId = order.id
 
     const orderItems = cart.items.map((item) => ({
@@ -247,7 +248,7 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
         p_order_id: order.id,
       })
       if (claimError) throw claimError
-      if (!claimOk) throw new Error('Kupon kullanım limitine ulaşıldı')
+      if (!claimOk) throw new PublicError('Kupon kullanım limitine ulaşıldı')
     }
 
     const provider = getPaymentProvider()

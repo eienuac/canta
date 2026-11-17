@@ -35,7 +35,7 @@ export function createFakeSupabase() {
     profiles: [],
   }
   const hooks: Record<string, (q: Query) => void> = {}
-  const state = { rpcError: false, rpcCalls: [] as string[] }
+  const state = { rpcError: false, rpcCalls: [] as string[], rateLimitHits: new Map<string, number>() }
 
   const tick = () => new Promise<void>((r) => setImmediate(r))
 
@@ -184,6 +184,13 @@ export function createFakeSupabase() {
       return true
     },
     coupon_claim_ok: () => true,
+    // Mirrors public.rate_limit_hit: true while the key is within its limit.
+    rate_limit_hit: ({ p_key, p_limit }) => {
+      const key = String(p_key)
+      const count = (state.rateLimitHits.get(key) ?? 0) + 1
+      state.rateLimitHits.set(key, count)
+      return count <= Number(p_limit)
+    },
   }
 
   const client = {

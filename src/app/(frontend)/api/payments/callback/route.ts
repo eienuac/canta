@@ -3,6 +3,7 @@ import { processCheckoutFormToken } from '@/services/orders'
 import { absoluteUrl } from '@/lib/utils'
 import { getErrorMessage } from '@/lib/errors'
 import { signOrderAccess } from '@/lib/order-token'
+import { rateLimit, requestIp } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,8 +29,15 @@ async function readCallbackToken(request: Request): Promise<string | null> {
   }
 }
 
+/** A browser returns once per payment; anything above this is abuse (each call hits iyzico). */
+const CALLBACK_LIMIT_PER_MINUTE = 30
+
 async function handle(request: Request, kind: string) {
   try {
+    if (!(await rateLimit(`payment-callback:${requestIp(request)}`, CALLBACK_LIMIT_PER_MINUTE, 60_000))) {
+      return NextResponse.redirect(absoluteUrl('/checkout/failure?reason=rate_limited'))
+    }
+
     const token = await readCallbackToken(request)
     if (!token) {
       return NextResponse.redirect(absoluteUrl('/checkout/failure?reason=missing_token'))

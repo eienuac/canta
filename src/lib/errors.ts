@@ -1,4 +1,27 @@
-/** Normalize thrown values (PostgrestError, Zod, Error) into a message string. */
+/**
+ * An error whose message is written for the customer (business rule: empty cart, out of
+ * stock, invalid coupon, …). Only these — and input validation errors — may be shown to
+ * the client; every other error (database, payment provider, configuration) is replaced
+ * by a generic message so internals are never leaked.
+ */
+export class PublicError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'PublicError'
+  }
+}
+
+/** Message that is safe to return to the client. Log the original error server-side. */
+export function publicErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof PublicError) return error.message
+  if (error instanceof Error && error.name === 'ZodError') {
+    const issues = (error as Error & { issues?: Array<{ message?: string }> }).issues
+    return issues?.[0]?.message || fallback
+  }
+  return fallback
+}
+
+/** Normalize thrown values (PostgrestError, Zod, Error) into a message string. Server-side logging only. */
 export function getErrorMessage(error: unknown, fallback = 'Failed'): string {
   if (!error) return fallback
   if (typeof error === 'string') return error
