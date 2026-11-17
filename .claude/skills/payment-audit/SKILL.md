@@ -1,6 +1,6 @@
 ---
 name: payment-audit
-description: Ödeme akışı denetimi — iyzico provider, callback/webhook imza doğrulama, sipariş doğrulama, fiyat manipülasyonu, çift ödeme/idempotency, stok rezervasyonu ve iade süreci. "ödeme denetimi", "checkout güvenliği" için kullan.
+description: Ödeme akışı denetimi — iyzico provider, callback/webhook imza doğrulama, sipariş doğrulama, fiyat manipülasyonu, çift ödeme/idempotency, stok rezervasyonu ve iade süreci. "ödeme denetimi", "checkout güvenliği", "payment audit", "webhook", "iade" için kullan.
 ---
 
 # Payment Audit (salt-okunur)
@@ -12,7 +12,7 @@ Kod değiştirme, `.env` okuma, gerçek ödeme/test çağrısı yapma.
 
 ## Kontrol listesi
 1. **Fiyat:** sunucu fiyatı DB/Payload'dan mı hesaplanıyor? İstemciden gelen price/total/indirim/kargo yok sayılıyor mu? Kupon sunucuda doğrulanıp tek kullanımlık "claim" ediliyor mu (006)?
-2. **Sipariş sahipliği:** checkout ve sipariş okuma yetkisi; misafir akışında `order-token` imza/süre.
+2. **Sipariş sahipliği:** checkout ve sipariş okuma yetkisi; `order-token` (HMAC; callback ve `checkout/success` erişimi) imza/süre.
 3. **Callback/Webhook:** imza/HMAC doğrulaması (timing-safe), provider'dan sunucu tarafı sorgu ile teyit, tutar+para birimi+orderId eşleşmesi, secret yoksa fail-closed.
 4. **Idempotency/çift ödeme:** aynı callback/webhook tekrarında tek finalize; durum geçişleri atomik (DB transaction/`rpc`/koşullu update); race condition.
 5. **Stok:** rezervasyon, ödeme başarısızlığında/timeout'ta serbest bırakma (cron `release-stock`), oversell.

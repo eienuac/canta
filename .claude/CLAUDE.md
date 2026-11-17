@@ -15,10 +15,9 @@
 - Kod değiştirmeden önce ilgili yapıyı analiz et.
 - Önemli değişikliklerden önce plan sun.
 - Kullanıcı onayı olmadan veritabanı silme/değiştirme (migration, `scripts/apply-*`, SQL) yapma.
-- `.env*` dosyalarını okuma, gizli bilgileri gösterme (`.env.example` yalnızca anahtar adları için).
+- `.env`, `.env.local` vb. dosyaları okuma, gizli bilgileri gösterme. Yalnızca `.env.example` (anahtar adları) okunabilir.
 - Güvenlik açıklarını doğrulamadan kesin bulgu olarak sunma; kanıt (dosya:satır) ve exploit senaryosu ver.
-- Next.js API'leri bildiğinden farklı olabilir; kod yazmadan önce `node_modules/next/dist/docs/` oku (AGENTS.md).
 - Yanıtlar kısa, anlaşılır, Türkçe; teknik terimler İngilizce kalır.
 
-## Skills (`/security-audit`, `/payment-audit`, `/supabase-audit`, `/code-review`)
-Denetim skill'leri varsayılan olarak salt-okunurdur; kaynak kodu değiştirmez.
+## Skills
+`/security-audit`, `/payment-audit`, `/supabase-audit`, `/project-code-review` salt-okunurdur. Next.js kodu yazarken AGENTS.md'ye uy.
