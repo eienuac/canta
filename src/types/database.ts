@@ -109,6 +109,7 @@ export type Database = {
         cart_id: string | null
         status:
           | 'pending_payment'
+          | 'payment_review'
           | 'payment_received'
           | 'preparing'
           | 'shipped'
@@ -128,6 +129,11 @@ export type Database = {
         tracking_number: string | null
         notes: string | null
         idempotency_key: string | null
+        needs_review: boolean
+        review_reason: string | null
+        stock_committed_at: string | null
+        reviewed_by: string | null
+        reviewed_at: string | null
         created_at: string
         updated_at: string
       }>
@@ -153,6 +159,14 @@ export type Database = {
         status: 'pending' | 'authorized' | 'paid' | 'failed' | 'refunded' | 'partially_refunded'
         raw_response: Json | null
         idempotency_key: string | null
+        price: number | null
+        paid_price: number | null
+        installment: number | null
+        provider_reference: string | null
+        superseded_at: string | null
+        refund_state: 'none' | 'required' | 'requested' | 'processing' | 'succeeded' | 'failed'
+        refund_reference: string | null
+        refunded_at: string | null
         created_at: string
         updated_at: string
       }>
@@ -234,10 +248,32 @@ export type Database = {
         Args: Record<string, never>
         Returns: boolean
       }
+      finalize_paid_order: {
+        Args: {
+          p_order_id: string
+          p_token: string | null
+          p_provider_reference: string | null
+          p_price: number | null
+          p_paid_price: number | null
+          p_currency: string | null
+          p_installment: number | null
+          p_summary: Json
+        }
+        Returns: Json
+      }
+      approve_payment_review: {
+        Args: { p_order_id: string; p_admin_id: string | null; p_note: string | null }
+        Returns: Json
+      }
+      record_manual_refund: {
+        Args: { p_payment_id: string; p_admin_id: string | null; p_reference: string }
+        Returns: Json
+      }
     }
     Enums: {
       order_status:
         | 'pending_payment'
+        | 'payment_review'
         | 'payment_received'
         | 'preparing'
         | 'shipped'

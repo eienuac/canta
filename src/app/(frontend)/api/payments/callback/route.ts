@@ -47,7 +47,9 @@ async function handle(request: Request, kind: string) {
     console.info('[payments/callback] outcome', { kind, outcome: outcome.kind })
 
     switch (outcome.kind) {
-      case 'paid': {
+      // 'review': the customer HAS paid; the order is held for a manual check.
+      case 'paid':
+      case 'review': {
         const access = signOrderAccess(outcome.orderId)
         return NextResponse.redirect(
           absoluteUrl(`/checkout/success?orderId=${outcome.orderId}&t=${access}`)

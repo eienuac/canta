@@ -18,9 +18,6 @@ import {
 
 vi.mock('@/lib/supabase/admin', () => import('../helpers/mocks/supabase-admin'))
 vi.mock('@/lib/payload', () => import('../helpers/mocks/payload'))
-vi.mock('@/services/inventory/sync', async (orig) =>
-  (await import('../helpers/mocks/inventory-sync')).withStubbedCmsStock(orig)
-)
 
 import { GET, POST } from '@/app/(frontend)/api/payments/callback/route'
 import { POST as WEBHOOK } from '@/app/(frontend)/api/payments/webhook/route'

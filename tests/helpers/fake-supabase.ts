@@ -34,7 +34,8 @@ export function createFakeSupabase() {
     carts: [],
     profiles: [],
   }
-  const hooks: Record<string, (q: Query) => void> = {}
+  /** Per `table:op` hook: throw to simulate a transport failure, or return a result (e.g. `{ data: null, error }`) to simulate a database error. */
+  const hooks: Record<string, (q: Query) => void | Result> = {}
   const state = { rpcError: false, rpcCalls: [] as string[], rateLimitHits: new Map<string, number>() }
 
   const tick = () => new Promise<void>((r) => setImmediate(r))
@@ -103,7 +104,8 @@ export function createFakeSupabase() {
 
     private async run(): Promise<Result> {
       await tick()
-      hooks[`${this.table}:${this.op}`]?.(this)
+      const hooked = hooks[`${this.table}:${this.op}`]?.(this)
+      if (hooked) return hooked
       const rows = (tables[this.table] ??= [])
       let data: Row[]
       if (this.op === 'insert') {
@@ -184,6 +186,38 @@ export function createFakeSupabase() {
       return true
     },
     coupon_claim_ok: () => true,
+    // Simplified mirror of public.finalize_paid_order (migration 008; the real SQL incl. the
+    // Payload CMS stock is covered by tests/sql/payment-integrity.test.ts).
+    finalize_paid_order: (a) => finalizePaidOrder(a),
+    approve_payment_review: (a) => {
+      const o = tables.orders.find((r) => r.id === a.p_order_id) as Order | undefined
+      if (!o) throw new Error('order not found')
+      if (o.status !== 'payment_review' || o.payment_status !== 'paid') {
+        throw new Error('order is not awaiting payment review')
+      }
+      commitOrderStock(o)
+      Object.assign(o, {
+        status: 'payment_received',
+        stock_committed_at: new Date().toISOString(),
+        needs_review: false,
+        reviewed_by: a.p_admin_id,
+      })
+      return { result: 'approved' }
+    },
+    record_manual_refund: (a) => {
+      if (!String(a.p_reference ?? '').trim()) throw new Error('refund reference is required')
+      const pay = tables.payments.find((p) => p.id === a.p_payment_id)
+      if (!pay) throw new Error('payment not found')
+      if (pay.status !== 'paid' || pay.refund_state === 'succeeded') throw new Error('payment is not refundable')
+      Object.assign(pay, { refund_state: 'succeeded', refund_reference: String(a.p_reference).trim() })
+      const open = tables.payments.filter(
+        (p) => p.order_id === pay.order_id && p.status === 'paid' && p.refund_state !== 'succeeded'
+      ).length
+      const o = tables.orders.find((r) => r.id === pay.order_id)!
+      if (open === 0) Object.assign(o, { payment_status: 'refunded', needs_review: false })
+      else o.needs_review = tables.payments.some((p) => p.order_id === o.id && p.refund_state === 'required')
+      return { result: 'refunded', order_fully_refunded: open === 0 }
+    },
     // Mirrors public.rate_limit_hit: true while the key is within its limit.
     rate_limit_hit: ({ p_key, p_limit }) => {
       const key = String(p_key)
@@ -191,6 +225,113 @@ export function createFakeSupabase() {
       state.rateLimitHits.set(key, count)
       return count <= Number(p_limit)
     },
+  }
+
+  type Order = Row & { id: string; total: number; currency: string; payment_status: string; status: string }
+
+  function commitOrderStock(o: Order) {
+    const items = tables.order_items.filter((i) => i.order_id === o.id)
+    for (const it of items) {
+      const sku = it.product_sku_snapshot as string
+      const qty = Number(it.quantity)
+      if (ledgerHas(`order:${o.id}:commit:${sku}`)) continue
+      const live =
+        [`${o.idempotency_key}:reserve:${sku}`, `late:${o.id}:reserve:${sku}`, `review:${o.id}:reserve:${sku}`].some(
+          ledgerHas
+        ) && ![`${o.idempotency_key}:release:${sku}`, `cancel:${o.id}:release:${sku}`].some(ledgerHas)
+      const r = inv(sku)
+      if (!r) throw new Error(`insufficient stock for ${sku}`)
+      if (!live) {
+        if (r.quantity - r.reserved_quantity < qty) throw new Error(`insufficient stock for ${sku}`)
+        r.reserved_quantity += qty
+        ledger({ sku, order_id: o.id, delta: qty, reason: 'reserve', idempotency_key: `review:${o.id}:reserve:${sku}` })
+      }
+      if (r.quantity < qty || r.reserved_quantity < qty) throw new Error(`cannot commit stock for ${sku}`)
+      r.quantity -= qty
+      r.reserved_quantity -= qty
+      ledger({ sku, order_id: o.id, delta: -qty, reason: 'commit', idempotency_key: `order:${o.id}:commit:${sku}` })
+    }
+  }
+
+  function finalizePaidOrder(a: Record<string, unknown>) {
+    const o = tables.orders.find((r) => r.id === a.p_order_id) as Order | undefined
+    if (!o) throw new Error(`order ${String(a.p_order_id)} not found`)
+    const attempts = tables.payments
+      .filter((p) => p.order_id === o.id)
+      .filter((p) => (a.p_token != null ? p.provider_payment_id === a.p_token : !p.superseded_at))
+    const pay = attempts[attempts.length - 1]
+    if (!pay) throw new Error(a.p_token != null ? 'payment token mismatch' : 'payment not found')
+    if (pay.status === 'paid') return { result: 'duplicate' }
+
+    Object.assign(pay, {
+      status: 'paid',
+      price: a.p_price,
+      paid_price: a.p_paid_price,
+      installment: a.p_installment,
+      provider_reference: a.p_provider_reference ?? pay.provider_reference,
+      raw_response: a.p_summary,
+    })
+
+    if (o.payment_status === 'paid') {
+      pay.refund_state = 'required'
+      o.needs_review = true
+      o.review_reason = 'DUPLICATE_PAYMENT'
+      return { result: 'duplicate_payment' }
+    }
+
+    const price = a.p_price == null ? null : Number(a.p_price)
+    const paid = a.p_paid_price == null ? null : Number(a.p_paid_price)
+    let reason: string | null = null
+    if (a.p_currency != null && String(a.p_currency).toUpperCase() !== String(o.currency).toUpperCase()) {
+      reason = 'CURRENCY_MISMATCH'
+    } else if (price == null || Math.abs(price - Number(o.total)) > 0.01) reason = 'AMOUNT_MISMATCH'
+    else if (paid == null || paid + 0.01 < price) reason = 'PAID_LESS_THAN_PRICE'
+    else if (o.payment_status !== 'pending') reason = 'LATE_PAYMENT'
+    else if (
+      o.cart_id &&
+      tables.orders.some(
+        (x) =>
+          x.cart_id === o.cart_id &&
+          x.id !== o.id &&
+          x.payment_status === 'paid' &&
+          Number(x.total) === Number(o.total) &&
+          Math.abs(Date.parse(String(x.created_at)) - Date.parse(String(o.created_at))) < 7_200_000
+      )
+    ) {
+      reason = 'POSSIBLE_DUPLICATE_ORDER'
+    }
+    if (reason) {
+      Object.assign(o, { payment_status: 'paid', status: 'payment_review', needs_review: true, review_reason: reason })
+      return { result: 'review', reason }
+    }
+
+    const snapshot = {
+      inventory: structuredClone(tables.inventory),
+      ledger: structuredClone(tables.inventory_ledger),
+    }
+    try {
+      commitOrderStock(o)
+    } catch (err) {
+      tables.inventory = snapshot.inventory // savepoint rollback
+      tables.inventory_ledger = snapshot.ledger
+      Object.assign(o, {
+        payment_status: 'paid',
+        status: 'payment_review',
+        needs_review: true,
+        review_reason: `STOCK: ${(err as Error).message}`,
+      })
+      return { result: 'review', reason: 'STOCK' }
+    }
+    Object.assign(o, { payment_status: 'paid', status: 'payment_received', stock_committed_at: new Date().toISOString() })
+
+    if (o.coupon_code) {
+      const coupon = tables.coupons.find((c) => c.code === o.coupon_code)
+      if (coupon && !tables.coupon_usages.some((u) => u.order_id === o.id)) {
+        tables.coupon_usages.push({ id: randomUUID(), coupon_id: coupon.id, order_id: o.id, user_id: o.user_id })
+      }
+    }
+    if (o.cart_id) tables.cart_items = tables.cart_items.filter((i) => i.cart_id !== o.cart_id)
+    return { result: 'paid' }
   }
 
   const client = {
@@ -203,7 +344,11 @@ export function createFakeSupabase() {
       }
       const fn = rpcs[name]
       if (!fn) return { data: null, error: { message: `unknown rpc ${name}` } }
-      return { data: fn(args), error: null }
+      try {
+        return { data: fn(args), error: null }
+      } catch (err) {
+        return { data: null, error: { message: (err as Error).message } }
+      }
     },
   }
 

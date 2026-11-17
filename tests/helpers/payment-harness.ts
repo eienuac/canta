@@ -5,8 +5,6 @@
  * Test files register the module mocks (vi.mock is hoisted per file):
  *   vi.mock('@/lib/supabase/admin', () => import('../helpers/mocks/supabase-admin'))
  *   vi.mock('@/lib/payload', () => import('../helpers/mocks/payload'))
- *   vi.mock('@/services/inventory/sync', async (orig) =>
- *     (await import('../helpers/mocks/inventory-sync')).withStubbedCmsStock(orig))
  */
 import { afterEach, beforeEach, vi } from 'vitest'
 import { createFakeSupabase, type FakeDb } from './fake-supabase'
