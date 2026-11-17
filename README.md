@@ -36,7 +36,7 @@ Premium deri çanta ve cüzdan e-ticaret platformu.
 - `SUPABASE_SERVICE_ROLE_KEY`, `PAYMENT_SECRET_KEY`, `PAYLOAD_SECRET` asla client bundle’a konmaz
 - Fiyat/stok/kupon doğrulaması server-side
 - Ödeme yalnızca provider webhook/callback doğrulaması sonrası finalize edilir (idempotent)
-- App admin yetkisi `profiles.role = admin` veya `ADMIN_EMAILS` ile server-side kontrol edilir
+- App admin yetkisi yalnızca `profiles.role = admin` (doğrulanmış e-posta, banlı olmayan hesap) ile server-side kontrol edilir
 
 ## Marka
 

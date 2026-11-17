@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { requireAppAdmin } from '@/lib/admin'
+import { isEligibleAdminUser, requireAppAdmin } from '@/lib/admin'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export async function PATCH(request: Request) {
@@ -23,6 +23,20 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = getSupabaseAdmin()
+
+  if (body.role === 'admin') {
+    const { data: target, error: targetError } = await supabase.auth.admin.getUserById(body.userId)
+    if (targetError || !target?.user) {
+      return NextResponse.json({ error: 'Kullanıcı bulunamadı' }, { status: 404 })
+    }
+    if (!isEligibleAdminUser(target.user)) {
+      return NextResponse.json(
+        { error: 'E-posta adresi doğrulanmamış veya hesabı askıya alınmış kullanıcı admin yapılamaz' },
+        { status: 400 }
+      )
+    }
+  }
+
   const { error } = await supabase
     .from('profiles')
     .update({ role: body.role, updated_at: new Date().toISOString() })
