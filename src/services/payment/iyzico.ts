@@ -21,6 +21,25 @@ type AuthParts = {
   }
 }
 
+/** Card metadata and the rendered form are never persisted (payments.raw_response). */
+const REDACTED_PROVIDER_KEYS = [
+  'binNumber',
+  'lastFourDigits',
+  'cardAssociation',
+  'cardFamily',
+  'cardType',
+  'cardUserKey',
+  'cardToken',
+  'checkoutFormContent',
+]
+
+export function redactProviderPayload<T>(raw: T): T {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw
+  const copy = { ...(raw as Record<string, unknown>) }
+  for (const key of REDACTED_PROVIDER_KEYS) delete copy[key]
+  return copy as T
+}
+
 /**
  * iyzico Checkout Form integration (IYZWSv2 HMAC-SHA256).
  * Signature MUST be hex-encoded (not base64) — see:
@@ -221,7 +240,7 @@ export class IyzicoPaymentProvider implements PaymentProvider {
       paymentPageUrl: raw.paymentPageUrl,
       token: raw.token,
       providerPaymentId: raw.token,
-      raw,
+      raw: redactProviderPayload(raw),
     }
   }
 
@@ -272,7 +291,7 @@ export class IyzicoPaymentProvider implements PaymentProvider {
           status: paid ? 'paid' : failed ? 'failed' : 'pending',
           amount: retrieved.paidPrice != null ? Number(retrieved.paidPrice) : undefined,
           currency: retrieved.currency ? String(retrieved.currency) : undefined,
-          raw: retrieved,
+          raw: redactProviderPayload(retrieved),
         }
       }
     } catch (err) {
@@ -312,7 +331,7 @@ export class IyzicoPaymentProvider implements PaymentProvider {
       orderId: parsed.conversationId,
       status: paymentStatus === 'SUCCESS' ? 'paid' : 'failed',
       amount: parsed.paidPrice ? Number(parsed.paidPrice) : undefined,
-      raw: parsed,
+      raw: redactProviderPayload(parsed),
     }
   }
 

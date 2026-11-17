@@ -45,7 +45,6 @@ async function main() {
   }
 
   console.log('OK_PROMOTED', { email: profile.email, role: profile.role })
-  console.log('Also add this email to ADMIN_EMAILS in .env.local if you want env-based access.')
 }
 
 main().catch((e) => {
