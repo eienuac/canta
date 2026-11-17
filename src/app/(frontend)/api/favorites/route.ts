@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { listFavorites, toggleFavorite, ensureUserProfile } from '@/services/favorites'
-import { getErrorMessage } from '@/lib/errors'
+import { getErrorMessage, publicErrorMessage } from '@/lib/errors'
 import { z } from 'zod'
 
 export async function GET(request: Request) {
@@ -30,9 +30,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ favorited: favs.some((f) => f.product_id === productId) })
   } catch (e) {
-    const message = getErrorMessage(e)
-    console.error('[GET /api/favorites]', message, e)
-    return NextResponse.json({ error: message, favorited: false, favorites: [] }, { status: 500 })
+    console.error('[GET /api/favorites]', getErrorMessage(e), e)
+    return NextResponse.json(
+      { error: publicErrorMessage(e, 'Favoriler alınamadı'), favorited: false, favorites: [] },
+      { status: 500 }
+    )
   }
 }
 
@@ -68,8 +70,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result)
   } catch (e) {
-    const message = getErrorMessage(e)
-    console.error('[POST /api/favorites]', message, e)
-    return NextResponse.json({ error: message }, { status: 400 })
+    console.error('[POST /api/favorites]', getErrorMessage(e), e)
+    return NextResponse.json({ error: publicErrorMessage(e, 'Favori güncellenemedi') }, { status: 400 })
   }
 }

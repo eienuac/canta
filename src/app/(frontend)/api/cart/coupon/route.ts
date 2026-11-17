@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { publicErrorMessage } from '@/lib/errors'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
@@ -64,9 +65,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ discount: result.discount, code: result.coupon.code })
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Kupon uygulanamadı' },
-      { status: 400 }
-    )
+    console.error('[POST /api/cart/coupon]', e instanceof Error ? e.message : 'unknown')
+    return NextResponse.json({ error: publicErrorMessage(e, 'Kupon uygulanamadı') }, { status: 400 })
   }
 }

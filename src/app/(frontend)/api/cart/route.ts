@@ -13,7 +13,7 @@ import {
   assertCartItemAccess,
 } from '@/services/cart'
 import { rateLimit, clientIp } from '@/lib/rate-limit'
-import { getErrorMessage } from '@/lib/errors'
+import { getErrorMessage, publicErrorMessage } from '@/lib/errors'
 import { z } from 'zod'
 import type { User } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
@@ -65,10 +65,12 @@ export async function GET(request: Request) {
     const data = await getCartWithProducts(cart.id)
     return NextResponse.json(data)
   } catch (e) {
-    const message = getErrorMessage(e, 'Sepet alınamadı')
-    console.error('[GET /api/cart]', message, e)
+    console.error('[GET /api/cart]', getErrorMessage(e, 'Sepet alınamadı'), e)
     // Do not pretend success with an empty cart — client must retry with guestToken/auth
-    return NextResponse.json({ error: message, items: [], itemCount: 0, subtotal: 0 }, { status: 400 })
+    return NextResponse.json(
+      { error: publicErrorMessage(e, 'Sepet alınamadı'), items: [], itemCount: 0, subtotal: 0 },
+      { status: 400 }
+    )
   }
 }
 
@@ -84,9 +86,8 @@ export async function POST(request: Request) {
     const data = await getCartWithProducts(cart.id)
     return NextResponse.json({ item, ...data })
   } catch (e) {
-    const message = getErrorMessage(e, 'Sepete eklenemedi')
-    console.error('[POST /api/cart]', message, e)
-    return NextResponse.json({ error: message }, { status: 400 })
+    console.error('[POST /api/cart]', getErrorMessage(e, 'Sepete eklenemedi'), e)
+    return NextResponse.json({ error: publicErrorMessage(e, 'Sepete eklenemedi') }, { status: 400 })
   }
 }
 
@@ -105,9 +106,8 @@ export async function PATCH(request: Request) {
     const data = await getCartWithProducts(owned.cart_id)
     return NextResponse.json({ item, ...data })
   } catch (e) {
-    const message = getErrorMessage(e, 'Güncellenemedi')
-    console.error('[PATCH /api/cart]', message, e)
-    return NextResponse.json({ error: message }, { status: 400 })
+    console.error('[PATCH /api/cart]', getErrorMessage(e, 'Güncellenemedi'), e)
+    return NextResponse.json({ error: publicErrorMessage(e, 'Güncellenemedi') }, { status: 400 })
   }
 }
 
@@ -125,8 +125,7 @@ export async function DELETE(request: Request) {
     const data = await getCartWithProducts(existing.cart_id)
     return NextResponse.json({ ok: true, ...data })
   } catch (e) {
-    const message = getErrorMessage(e, 'Silinemedi')
-    console.error('[DELETE /api/cart]', message, e)
-    return NextResponse.json({ error: message }, { status: 400 })
+    console.error('[DELETE /api/cart]', getErrorMessage(e, 'Silinemedi'), e)
+    return NextResponse.json({ error: publicErrorMessage(e, 'Silinemedi') }, { status: 400 })
   }
 }

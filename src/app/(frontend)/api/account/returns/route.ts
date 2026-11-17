@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { publicErrorMessage } from '@/lib/errors'
 import { createClient } from '@/lib/supabase/server'
 import { createReturnRequest } from '@/services/returns'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { rateLimit } from '@/lib/rate-limit'
-import { z } from 'zod'
 
 export async function GET() {
   const supabase = await createClient()
@@ -38,12 +38,7 @@ export async function POST(request: Request) {
     const result = await createReturnRequest({ ...body, userId: user.id })
     return NextResponse.json({ return: result })
   } catch (e) {
-    const message =
-      e instanceof z.ZodError
-        ? e.issues[0]?.message || 'Geçersiz istek'
-        : e instanceof Error
-          ? e.message
-          : 'Failed'
-    return NextResponse.json({ error: message }, { status: 400 })
+    console.error('[POST /api/account/returns]', e instanceof Error ? e.message : 'unknown')
+    return NextResponse.json({ error: publicErrorMessage(e, 'İade talebi oluşturulamadı') }, { status: 400 })
   }
 }

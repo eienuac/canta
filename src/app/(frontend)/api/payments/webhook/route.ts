@@ -6,6 +6,7 @@ import {
   processCheckoutFormToken,
   resolveOrderIdFromPaymentResult,
 } from '@/services/orders'
+import { rateLimit, requestIp } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,7 +14,14 @@ export const maxDuration = 60
 
 const SIGNATURE_HEADERS = ['x-iyzico-signature', 'x-payment-signature']
 
+/** Generous: iyzico may retry, but unauthenticated floods must not reach the provider API. */
+const WEBHOOK_LIMIT_PER_MINUTE = 120
+
 export async function POST(request: Request) {
+  if (!(await rateLimit(`payment-webhook:${requestIp(request)}`, WEBHOOK_LIMIT_PER_MINUTE, 60_000))) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   const body = await request.text()
   const signed = SIGNATURE_HEADERS.some((h) => request.headers.get(h))
 

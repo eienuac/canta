@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PublicError } from '@/lib/errors'
 import { timingSafeEqual } from 'crypto'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { getAvailableStock, syncProductInventory } from '@/services/inventory/sync'
@@ -53,15 +54,15 @@ export async function assertCartAccess(
     .eq('id', cartId)
     .maybeSingle()
   if (error) throw error
-  if (!cart) throw new Error('Sepet bulunamadı')
+  if (!cart) throw new PublicError('Sepet bulunamadı')
 
   if (userId) {
-    if (cart.user_id !== userId) throw new Error('Bu sepet size ait değil')
+    if (cart.user_id !== userId) throw new PublicError('Bu sepet size ait değil')
     return cart
   }
 
   if (!guestToken || !cart.guest_token || !safeEqual(cart.guest_token, guestToken)) {
-    throw new Error('Misafir sepet doğrulanamadı')
+    throw new PublicError('Misafir sepet doğrulanamadı')
   }
   return cart
 }
@@ -79,7 +80,7 @@ export async function assertCartItemAccess(
     .eq('id', itemId)
     .maybeSingle()
   if (error) throw error
-  if (!item) throw new Error('Sepet kalemi bulunamadı')
+  if (!item) throw new PublicError('Sepet kalemi bulunamadı')
   await assertCartAccess(item.cart_id, userId, guestToken)
   return item
 }
@@ -252,20 +253,20 @@ export async function addToCart(
   })) as Product
 
   if (!product || product._status !== 'published' || !product.isActive) {
-    throw new Error('Ürün satışta değil')
+    throw new PublicError('Ürün satışta değil')
   }
 
   const validSkus = new Set<string>([product.sku].filter(Boolean))
   product.variants?.forEach((v) => v.sku && validSkus.add(v.sku))
   if (!validSkus.has(input.sku)) {
-    throw new Error('SKU bu ürüne ait değil')
+    throw new PublicError('SKU bu ürüne ait değil')
   }
 
   await syncProductInventory(product).catch(() => null)
 
   const available = await getAvailableStock(input.sku)
   if (available < input.quantity) {
-    throw new Error(
+    throw new PublicError(
       available <= 0
         ? 'Bu ürün stokta yok'
         : `Yeterli stok yok (kalan: ${available})`
@@ -283,7 +284,7 @@ export async function addToCart(
 
   const nextQty = (existing?.quantity ?? 0) + input.quantity
   if (nextQty > available) {
-    throw new Error(`Yeterli stok yok (kalan: ${available})`)
+    throw new PublicError(`Yeterli stok yok (kalan: ${available})`)
   }
 
   if (existing) {
@@ -321,7 +322,7 @@ export async function updateCartItemQuantity(itemId: string, quantity: number) {
   }
 
   const { data: item } = await supabase.from('cart_items').select('*').eq('id', itemId).single()
-  if (!item) throw new Error('Sepet kalemi bulunamadı')
+  if (!item) throw new PublicError('Sepet kalemi bulunamadı')
 
   // Refresh CMS → inventory before validating
   try {
@@ -340,7 +341,7 @@ export async function updateCartItemQuantity(itemId: string, quantity: number) {
 
   const available = await getAvailableStock(item.sku)
   if (quantity > available) {
-    throw new Error(
+    throw new PublicError(
       available <= 0 ? 'Bu ürün stokta yok' : `Yeterli stok yok (kalan: ${available})`
     )
   }
@@ -464,11 +465,11 @@ export async function getCartWithProducts(cartId: string) {
 /** Throws if any cart line cannot be fulfilled. */
 export async function assertCartStockAvailable(cartId: string) {
   const { items, hasStockIssues } = await getCartWithProducts(cartId)
-  if (!items.length) throw new Error('Sepet boş')
+  if (!items.length) throw new PublicError('Sepet boş')
   if (hasStockIssues) {
     const bad = items.filter((i) => i.stockStatus !== 'ok')
     const names = bad.map((i) => i.name).join(', ')
-    throw new Error(`Sepetinizde stok sorunu var: ${names}`)
+    throw new PublicError(`Sepetinizde stok sorunu var: ${names}`)
   }
   return items
 }

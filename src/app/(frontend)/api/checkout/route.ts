@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { checkoutSchema, createCheckoutSession } from '@/services/orders'
+import { PaymentNotConfiguredError } from '@/services/payment'
 import { rateLimit, clientIp } from '@/lib/rate-limit'
-import { getErrorMessage } from '@/lib/errors'
+import { getErrorMessage, publicErrorMessage } from '@/lib/errors'
 import type { Database } from '@/types/database'
 import type { User } from '@supabase/supabase-js'
 
@@ -59,9 +60,13 @@ export async function POST(request: Request) {
       reused: result.reused,
     })
   } catch (e) {
-    const message = getErrorMessage(e, 'Checkout failed')
-    console.error('[POST /api/checkout]', message)
-    const status = message.toLowerCase().includes('configured') ? 503 : 400
-    return NextResponse.json({ error: message }, { status })
+    console.error('[POST /api/checkout]', getErrorMessage(e, 'Checkout failed'))
+    if (e instanceof PaymentNotConfiguredError) {
+      return NextResponse.json({ error: 'Ödeme şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.' }, { status: 503 })
+    }
+    return NextResponse.json(
+      { error: publicErrorMessage(e, 'Ödeme başlatılamadı. Lütfen tekrar deneyin.') },
+      { status: 400 }
+    )
   }
 }

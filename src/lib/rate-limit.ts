@@ -46,12 +46,20 @@ export async function rateLimit(key: string, limit = 20, windowMs = 60_000): Pro
   }
 }
 
-/** Best-effort client IP. Vercel overwrites x-forwarded-for, so the first hop is trustworthy there. */
-export async function clientIp(): Promise<string> {
-  const h = await headers()
+function ipFromHeaders(h: Headers): string {
   return (
     h.get('x-real-ip')?.trim() ||
     h.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     '127.0.0.1'
   )
+}
+
+/** Best-effort client IP. Vercel overwrites x-forwarded-for, so the first hop is trustworthy there. */
+export async function clientIp(): Promise<string> {
+  return ipFromHeaders(await headers())
+}
+
+/** Same as clientIp(), read from a Request (route handlers that receive the request object). */
+export function requestIp(request: Request): string {
+  return ipFromHeaders(request.headers)
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PublicError } from '@/lib/errors'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export const reviewSchema = z.object({
@@ -22,7 +23,7 @@ export async function createReview(input: z.infer<typeof reviewSchema>) {
     .single()
 
   if (!order || order.status !== 'delivered') {
-    throw new Error('Yalnızca teslim alınan ürünlere yorum yapılabilir')
+    throw new PublicError('Yalnızca teslim alınan ürünlere yorum yapılabilir')
   }
 
   const { data: item } = await supabase
@@ -32,7 +33,7 @@ export async function createReview(input: z.infer<typeof reviewSchema>) {
     .eq('product_id', data.productId)
     .maybeSingle()
 
-  if (!item) throw new Error('Bu siparişte ürün bulunamadı')
+  if (!item) throw new PublicError('Bu siparişte ürün bulunamadı')
 
   const { data: review, error } = await supabase
     .from('reviews')
