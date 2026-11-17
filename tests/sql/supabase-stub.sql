@@ -34,18 +34,18 @@ create table storage.buckets (
 
 create schema payload;
 create table payload.media (id serial primary key);
-create table payload.users (id serial primary key, email varchar, role varchar);
+create table payload.users (id serial primary key, email varchar(255), role varchar(255));
 create table payload.products (
   id serial primary key,
-  sku varchar,
+  sku varchar(255),
   stock numeric,
-  _status varchar default 'published'
+  _status varchar(255) default 'published'
 );
 create unique index products_sku_idx on payload.products (sku);
 create table payload.products_variants (
   _order integer not null default 1,
   _parent_id integer not null references payload.products (id) on delete cascade,
-  id varchar primary key,
-  sku varchar,
+  id varchar(255) primary key,
+  sku varchar(255),
   stock numeric
 );
