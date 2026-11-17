@@ -265,25 +265,22 @@ export class IyzicoPaymentProvider implements PaymentProvider {
           conversationId: retrieved.conversationId,
         })
 
-        const conversationId = retrieved.conversationId
-          ? String(retrieved.conversationId)
-          : parsed.conversationId
-            ? String(parsed.conversationId)
-            : undefined
+        // Only the provider's own answer is trusted. Fields sent by the caller (e.g. a
+        // conversationId in the callback body) are ignored: the order is resolved from the
+        // token we issued (see processCheckoutFormToken).
+        const conversationId = retrieved.conversationId ? String(retrieved.conversationId) : undefined
         const basketId = retrieved.basketId ? String(retrieved.basketId) : undefined
-        const token = String(retrieved.token || parsed.token || '')
+        const token = String(parsed.token)
         const paymentStatus = String(retrieved.paymentStatus || '').toUpperCase()
         const apiOk = retrieved.status === 'success'
-        const paid = paymentStatus === 'SUCCESS'
-        const failed =
-          paymentStatus === 'FAILURE' ||
-          paymentStatus === 'FAILED' ||
-          retrieved.status === 'failure'
+        const tokenMatches = !retrieved.token || String(retrieved.token) === token
+        // An API error (unknown/expired token, outage) is NOT a payment failure: we could not
+        // verify anything, so nothing may change. Only an explicit FAILURE is a failed payment.
+        const paid = apiOk && paymentStatus === 'SUCCESS'
+        const failed = apiOk && (paymentStatus === 'FAILURE' || paymentStatus === 'FAILED')
 
-        // iyzico CF retrieve often omits conversationId even when payment succeeded.
-        // Treat SUCCESS + token/basketId as valid; resolve orderId via basketId/token in callback.
         return {
-          valid: Boolean(apiOk || failed) && (paid || failed || Boolean(token)),
+          valid: apiOk && tokenMatches,
           providerPaymentId: retrieved.paymentId ? String(retrieved.paymentId) : token || undefined,
           orderId: conversationId,
           basketId,

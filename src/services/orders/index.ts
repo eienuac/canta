@@ -401,8 +401,99 @@ async function cancelPendingOrdersForCart(cartId: string) {
   }
 }
 
+/** Throws unless `token` is a checkout token we issued for this order. */
+async function assertTokenBelongsToOrder(orderId: string, token: string) {
+  const supabase = getSupabaseAdmin()
+  const { data: tokenRow } = await supabase
+    .from('payments')
+    .select('id')
+    .eq('order_id', orderId)
+    .eq('provider_payment_id', token)
+    .limit(1)
+    .maybeSingle()
+  if (!tokenRow) throw new Error('Payment token mismatch')
+}
+
+/** The order a checkout token was issued for, or null if we never issued it. */
+export async function findOrderIdByCheckoutToken(token: string): Promise<string | null> {
+  if (!token) return null
+  const supabase = getSupabaseAdmin()
+  const { data } = await supabase
+    .from('payments')
+    .select('order_id')
+    .eq('provider_payment_id', token)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return data?.order_id ?? null
+}
+
+export type CheckoutFormOutcome =
+  | { kind: 'unknown_token' }
+  | { kind: 'unverified'; orderId: string }
+  | { kind: 'mismatch'; orderId: string }
+  | { kind: 'paid'; orderId: string }
+  | { kind: 'failed'; orderId: string }
+  | { kind: 'pending'; orderId: string }
+
+/**
+ * Single entry point for an iyzico Checkout Form result (browser callback or webhook).
+ * 1) the token must be one WE issued → that fixes the order (caller input is never trusted)
+ * 2) the result is retrieved from iyzico (unknown tokens never cause a provider call)
+ * 3) the provider's conversationId / basketId, when present, must match that order
+ * Only then is the order finalized or marked failed.
+ */
+export async function processCheckoutFormToken(token: string): Promise<CheckoutFormOutcome> {
+  const orderId = await findOrderIdByCheckoutToken(token)
+  if (!orderId) return { kind: 'unknown_token' }
+
+  const verified = await getPaymentProvider().verifyWebhook(new Headers(), JSON.stringify({ token }))
+  if (!verified.valid) return { kind: 'unverified', orderId }
+
+  const supabase = getSupabaseAdmin()
+  const { data: order } = await supabase
+    .from('orders')
+    .select('id, order_number')
+    .eq('id', orderId)
+    .maybeSingle()
+  if (!order) return { kind: 'unverified', orderId }
+  if (
+    (verified.orderId && verified.orderId !== order.id) ||
+    (verified.basketId && verified.basketId !== order.order_number)
+  ) {
+    console.error('[processCheckoutFormToken] provider result does not match token order', { orderId })
+    return { kind: 'mismatch', orderId }
+  }
+
+  if (verified.status === 'paid') {
+    await finalizePaidOrder({
+      orderId,
+      token,
+      providerPaymentId: verified.providerPaymentId,
+      amount: verified.amount,
+      currency: verified.currency,
+      raw: verified.raw,
+    })
+    return { kind: 'paid', orderId }
+  }
+
+  if (verified.status === 'failed') {
+    await markOrderPaymentFailed({
+      orderId,
+      token,
+      providerPaymentId: verified.providerPaymentId,
+      raw: verified.raw,
+    })
+    return { kind: 'failed', orderId }
+  }
+
+  return { kind: 'pending', orderId }
+}
+
 export async function markOrderPaymentFailed(params: {
   orderId: string
+  /** iyzico checkout-form token; when given it must belong to this order */
+  token?: string
   providerPaymentId?: string
   raw?: unknown
   webhookIdempotencyKey?: string
@@ -414,6 +505,8 @@ export async function markOrderPaymentFailed(params: {
   if (order.payment_status === 'paid') {
     return { ok: true, ignored: true as const }
   }
+
+  if (params.token) await assertTokenBelongsToOrder(order.id, params.token)
 
   const cancelled = await cancelPendingOrder(order.id)
 
@@ -464,16 +557,7 @@ export async function finalizePaidOrder(params: {
   }
 
   // The checkout token must be the one we issued for THIS order.
-  if (params.token) {
-    const { data: tokenRow } = await supabase
-      .from('payments')
-      .select('id')
-      .eq('order_id', order.id)
-      .eq('provider_payment_id', params.token)
-      .limit(1)
-      .maybeSingle()
-    if (!tokenRow) throw new Error('Payment token mismatch')
-  }
+  if (params.token) await assertTokenBelongsToOrder(order.id, params.token)
 
   // Atomic claim: only one concurrent caller can flip the order to paid.
   // 1) normal path — stock is still reserved
@@ -504,9 +588,10 @@ export async function finalizePaidOrder(params: {
 
   await supabase
     .from('payments')
+    // provider_payment_id keeps the checkout token we issued: later callbacks / webhooks for
+    // this payment are matched by it. The iyzico paymentId stays available in raw_response.
     .update({
       status: 'paid',
-      provider_payment_id: params.providerPaymentId ?? params.token ?? null,
       raw_response: (params.raw as import('@/types/database').Json) ?? null,
       updated_at: now,
     })
@@ -647,17 +732,7 @@ export async function resolveOrderIdFromPaymentResult(input: {
     if (data?.id) return data.id
   }
 
-  const token = input.token || null
-  if (token) {
-    const { data } = await supabase
-      .from('payments')
-      .select('order_id')
-      .eq('provider_payment_id', token)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (data?.order_id) return data.order_id
-  }
+  if (input.token) return findOrderIdByCheckoutToken(input.token)
 
   return null
 }
