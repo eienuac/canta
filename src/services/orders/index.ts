@@ -588,9 +588,10 @@ export async function finalizePaidOrder(params: {
 
   await supabase
     .from('payments')
+    // provider_payment_id keeps the checkout token we issued: later callbacks / webhooks for
+    // this payment are matched by it. The iyzico paymentId stays available in raw_response.
     .update({
       status: 'paid',
-      provider_payment_id: params.providerPaymentId ?? params.token ?? null,
       raw_response: (params.raw as import('@/types/database').Json) ?? null,
       updated_at: now,
     })

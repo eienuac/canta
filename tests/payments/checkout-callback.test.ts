@@ -3,9 +3,9 @@
  * Runs the real callback + webhook routes and order service against an in-memory Supabase;
  * iyzico is replaced by a stubbed fetch (no network).
  */
-import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createFakeSupabase, type FakeDb } from '../helpers/fake-supabase'
+import { orderRow, seedPendingOrder, stockRow } from '../helpers/orders'
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as FakeDb }))
 
@@ -31,39 +31,10 @@ const fetchMock = vi.fn(async (_url: string, init: { body: string }) => ({
   json: async () => iyzico(JSON.parse(init.body)),
 }))
 
-function seedOrder(opts: { token: string; total?: number; sku?: string }) {
-  const id = randomUUID()
-  const sku = opts.sku ?? `SKU-${id.slice(0, 4)}`
-  const total = opts.total ?? 1000
-  ctx.db.tables.inventory.push({ sku, quantity: 5, reserved_quantity: 1 })
-  ctx.db.tables.orders.push({
-    id,
-    order_number: `SC${id.slice(0, 6)}`,
-    status: 'pending_payment',
-    payment_status: 'pending',
-    total,
-    currency: 'TRY',
-    notes: null,
-    cart_id: null,
-    coupon_code: null,
-    user_id: null,
-    guest_email: 'g@test.local',
-    created_at: new Date().toISOString(),
-  })
-  ctx.db.tables.order_items.push({ id: randomUUID(), order_id: id, product_sku_snapshot: sku, quantity: 1 })
-  ctx.db.tables.payments.push({
-    id: randomUUID(),
-    order_id: id,
-    provider_payment_id: opts.token,
-    status: 'pending',
-    amount: total,
-    created_at: new Date().toISOString(),
-  })
-  return { id, sku, orderNumber: `SC${id.slice(0, 6)}` }
-}
+const seedOrder = (opts: { token: string; total?: number; sku?: string }) => seedPendingOrder(ctx.db, opts)
 
-const order = (id: string) => ctx.db.tables.orders.find((o) => o.id === id)!
-const stock = (sku: string) => ctx.db.tables.inventory.find((r) => r.sku === sku)!
+const order = (id: string) => orderRow(ctx.db, id)
+const stock = (sku: string) => stockRow(ctx.db, sku)
 const location = (res: Response) => res.headers.get('location') ?? ''
 
 function formPost(fields: Record<string, string>) {
