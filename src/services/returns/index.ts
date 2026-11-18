@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { PublicError } from '@/lib/errors'
+import { adminError } from '@/lib/admin-errors'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 const MAX_REQUESTS_PER_ORDER = 3
@@ -143,7 +144,7 @@ export async function updateReturnStatus(
     .eq('id', returnId)
     .select('*')
     .single()
-  if (error) throw error
+  if (error) throw adminError(error, 'İade talebi güncellenemedi.')
   return data
 }
 

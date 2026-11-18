@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid'
 import { PublicError } from '@/lib/errors'
+import { adminError } from '@/lib/admin-errors'
 import type { OrderStatus } from '@/types/database'
 import { z } from 'zod'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
@@ -616,25 +617,6 @@ export async function finalizePaidOrder(params: {
 // Admin operations (order transitions are enforced by the orders_transition_guard trigger)
 // ---------------------------------------------------------------------------
 
-const ADMIN_ERROR_MESSAGES: Array<[RegExp, string]> = [
-  [/invalid order status transition/i, 'Bu durum geçişine izin verilmiyor.'],
-  [/invalid payment_status transition/i, 'Bu ödeme durumu geçişine izin verilmiyor.'],
-  [/paid with stock committed/i, 'Ödemesi alınmamış veya stoğu düşülmemiş sipariş bu duruma geçirilemez.'],
-  [/only be cancelled after a refund/i, 'Ödenmiş sipariş, iadesi kaydedilmeden iptal edilemez.'],
-  [/must be refunded first/i, '"İade edildi" durumu için önce ödeme iadesi kaydedilmelidir.'],
-  [/without a completed refund/i, 'Tamamlanmış bir iade kaydı olmadan sipariş iade edildi yapılamaz.'],
-  [/not awaiting payment review/i, 'Sipariş ödeme incelemesinde değil.'],
-  [/insufficient|cannot commit stock|CMS/i, 'Stok yetersiz; sipariş onaylanamadı. Ödemeyi iade edip siparişi iptal edin.'],
-  [/reference is required/i, 'iyzico iade referansı zorunludur.'],
-  [/not refundable/i, 'Bu ödeme iade edilebilir durumda değil.'],
-]
-
-function adminError(error: { message?: string } | null | undefined, fallback: string): PublicError {
-  const message = error?.message ?? ''
-  const match = ADMIN_ERROR_MESSAGES.find(([re]) => re.test(message))
-  if (!match) console.error('[orders.admin]', message)
-  return new PublicError(match ? match[1] : fallback)
-}
 
 export async function adminUpdateOrderStatus(params: {
   orderId: string
@@ -663,15 +645,19 @@ export async function approvePaymentReview(orderId: string, adminId: string, not
   if (error) throw adminError(error, 'Sipariş onaylanamadı.')
 }
 
-/** Records a refund that was made manually in the iyzico panel (full refund of one payment). */
-export async function recordManualRefund(paymentId: string, adminId: string, reference: string) {
+/**
+ * Records a refund made manually in the iyzico panel. `amount` omitted = the remaining
+ * refundable amount of that payment; a smaller amount records a partial refund.
+ */
+export async function recordManualRefund(paymentId: string, adminId: string, reference: string, amount?: number) {
   const { data, error } = await getSupabaseAdmin().rpc('record_manual_refund', {
     p_payment_id: paymentId,
     p_admin_id: adminId,
     p_reference: reference,
+    p_amount: amount ?? null,
   })
   if (error) throw adminError(error, 'İade kaydedilemedi.')
-  return data as { result: string; order_fully_refunded: boolean }
+  return data as { result: string; amount: number; payment_fully_refunded: boolean; order_fully_refunded: boolean }
 }
 
 export async function getOrderById(orderId: string) {

@@ -16,6 +16,7 @@ export type AdminPaymentRow = {
   status: string
   amount: number
   paid_price: number | null
+  refunded_amount: number
   installment: number | null
   refund_state: string
   refund_reference: string | null
@@ -54,6 +55,7 @@ export function AdminOrderActions({
   const [tracking, setTracking] = useState(trackingNumber || '')
   const [note, setNote] = useState('')
   const [refundRefs, setRefundRefs] = useState<Record<string, string>>({})
+  const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
 
   async function run(body: Record<string, unknown>, success: string) {
@@ -69,7 +71,13 @@ export function AdminOrderActions({
     }
   }
 
-  const refundable = payments.filter((p) => p.status === 'paid' && p.refund_state !== 'succeeded')
+  const paidOf = (p: AdminPaymentRow) => Number(p.paid_price ?? p.amount)
+  const remainingOf = (p: AdminPaymentRow) => Math.max(0, paidOf(p) - Number(p.refunded_amount ?? 0))
+  const refundable = payments.filter((p) => p.status === 'paid' && remainingOf(p) > 0.001)
+  const parseAmount = (raw: string | undefined) => {
+    const v = (raw ?? '').trim().replace(',', '.')
+    return v === '' ? undefined : Number(v)
+  }
 
   return (
     <div className="mt-10 max-w-xl space-y-6">
@@ -106,15 +114,22 @@ export function AdminOrderActions({
                   {p.status} · {formatPrice(Number(p.paid_price ?? p.amount))}
                   {p.installment && p.installment > 1 ? ` · ${p.installment} taksit` : ''}
                   {p.superseded_at ? ' · eski deneme' : ''}
+                  {Number(p.refunded_amount) > 0 ? ` · iade edilen: ${formatPrice(Number(p.refunded_amount))}` : ''}
                   {p.refund_state !== 'none' ? ` · iade: ${p.refund_state}` : ''}
                   {p.refund_reference ? ` (${p.refund_reference})` : ''}
                 </p>
                 {refundable.some((r) => r.id === p.id) && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Input
                       placeholder="iyzico iade referansı"
                       value={refundRefs[p.id] ?? ''}
                       onChange={(e) => setRefundRefs((s) => ({ ...s, [p.id]: e.target.value }))}
+                    />
+                    <Input
+                      inputMode="decimal"
+                      placeholder={`Tutar (boş = kalan ${formatPrice(remainingOf(p))})`}
+                      value={refundAmounts[p.id] ?? ''}
+                      onChange={(e) => setRefundAmounts((s) => ({ ...s, [p.id]: e.target.value }))}
                     />
                     <Button
                       type="button"
@@ -122,7 +137,12 @@ export function AdminOrderActions({
                       disabled={busy || !(refundRefs[p.id] ?? '').trim()}
                       onClick={() =>
                         run(
-                          { action: 'record_refund', paymentId: p.id, reference: refundRefs[p.id] },
+                          {
+                            action: 'record_refund',
+                            paymentId: p.id,
+                            reference: refundRefs[p.id],
+                            amount: parseAmount(refundAmounts[p.id]),
+                          },
                           'İade kaydedildi'
                         )
                       }
@@ -135,7 +155,8 @@ export function AdminOrderActions({
             ))}
           </ul>
           <p className="text-xs text-muted">
-            İadeyi önce iyzico panelinden yapın, sonra referans numarasıyla buradan kaydedin.
+            Para iadesi yalnızca iyzico panelinden yapılır. İadeyi orada yapın, sonra referans numarası ve
+            (kısmi iadede) tutarla buradan kaydedin. Bu kayıt parayı hareket ettirmez.
           </p>
         </div>
       )}

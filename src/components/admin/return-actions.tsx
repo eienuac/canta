@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { RETURN_STATUS_LABELS } from '@/lib/labels'
 
 const NEXT = ['reviewing', 'approved', 'rejected', 'awaiting_shipment', 'received', 'refunded']
 
@@ -27,7 +28,7 @@ export function ReturnAdminActions({ returnId, status }: { returnId: string; sta
     <div className="mt-3 flex flex-wrap gap-2">
       {NEXT.filter((s) => s !== status).map((s) => (
         <Button key={s} type="button" size="sm" variant="secondary" onClick={() => setStatus(s)}>
-          {s}
+          {RETURN_STATUS_LABELS[s] || s}
         </Button>
       ))}
     </div>

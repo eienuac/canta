@@ -28,6 +28,12 @@ const bodySchema = z.union([
     action: z.literal('record_refund'),
     paymentId: z.string().uuid(),
     reference: z.string().trim().min(3).max(100),
+    /** omitted = remaining refundable amount */
+    amount: z
+      .number()
+      .positive()
+      .refine((v) => Math.abs(Math.round(v * 100) - v * 100) < 1e-6, 'En fazla 2 ondalık basamak')
+      .optional(),
   }),
 ])
 
@@ -41,7 +47,7 @@ export async function PATCH(request: Request) {
     if (body.action === 'approve_review') {
       await approvePaymentReview(body.orderId, admin.user.id, body.note)
     } else if (body.action === 'record_refund') {
-      const result = await recordManualRefund(body.paymentId, admin.user.id, body.reference)
+      const result = await recordManualRefund(body.paymentId, admin.user.id, body.reference, body.amount)
       return NextResponse.json({ ok: true, ...result })
     } else {
       await adminUpdateOrderStatus({
