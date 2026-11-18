@@ -322,12 +322,15 @@ begin
   if coalesce(trim(p_reference), '') = '' then
     raise exception 'refund reference is required';
   end if;
-  select * into pay from public.payments where id = p_payment_id for update;
+  -- Lock order: ORDER first, then PAYMENT — the same order as finalize_paid_order, so a
+  -- concurrent payment callback and a manual refund on one order cannot deadlock.
+  select order_id into o.id from public.payments where id = p_payment_id;
   if not found then raise exception 'payment % not found', p_payment_id; end if;
+  select * into o from public.orders where id = o.id for update;
+  select * into pay from public.payments where id = p_payment_id for update;
   if pay.status <> 'paid' or pay.refund_state = 'succeeded' then
     raise exception 'payment is not refundable';
   end if;
-  select * into o from public.orders where id = pay.order_id for update;
 
   update public.payments
   set refund_state = 'succeeded', refund_reference = trim(p_reference), refunded_at = now(), updated_at = now()

@@ -3,13 +3,12 @@
  * on top of tests/sql/supabase-stub.sql. Skipped unless TEST_DATABASE_URL is a local database.
  */
 import { randomUUID } from 'node:crypto'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Pool } from 'pg'
-import { createTestPool, testDatabaseUrl } from '../helpers/pg'
+import { applyMigrations, createTestPool, resetSupabaseSchema, testDatabaseUrl } from '../helpers/pg'
 
 const enabled = Boolean(testDatabaseUrl())
-const MIGRATIONS = readdirSync('supabase/migrations').filter((f) => f.endsWith('.sql')).sort()
 const sql = (file: string) => readFileSync(file, 'utf8')
 
 type Seeded = { orderId: string; token: string; sku: string; productId: number; cartId: string }
@@ -108,17 +107,8 @@ describe.skipIf(!enabled)('migration 008 — payment integrity', () => {
 
   beforeAll(async () => {
     pool = createTestPool()
-    await pool.query(`
-      drop schema if exists public cascade; create schema public;
-      drop schema if exists auth cascade; drop schema if exists storage cascade; drop schema if exists payload cascade;
-      grant usage on schema public to anon, authenticated, service_role;
-    `).catch(async () => {
-      // roles may not exist yet on a fresh database
-      await pool.query(`drop schema if exists public cascade; create schema public;
-        drop schema if exists auth cascade; drop schema if exists storage cascade; drop schema if exists payload cascade;`)
-    })
-    await pool.query(sql('tests/sql/supabase-stub.sql'))
-    for (const file of MIGRATIONS.filter((f) => f < '008')) await pool.query(sql(`supabase/migrations/${file}`))
+    await resetSupabaseSchema(pool)
+    await applyMigrations(pool, (f) => f < '008')
 
     // A legacy paid order (committed before 008) to check the backfill.
     const legacy = await seed()
@@ -149,7 +139,7 @@ describe.skipIf(!enabled)('migration 008 — payment integrity', () => {
     ])
     paidBetween008And009 = live.orderId
 
-    for (const file of MIGRATIONS.filter((f) => f > '008')) await pool.query(sql(`supabase/migrations/${file}`))
+    await applyMigrations(pool, (f) => f > '008')
   })
 
   afterAll(async () => {
@@ -374,6 +364,76 @@ describe.skipIf(!enabled)('migration 008 — payment integrity', () => {
       await expect(setStatus(s.orderId, 'shipped')).rejects.toThrow(/paid with stock committed/)
       await setStatus(s.orderId, 'cancelled')
       expect((await order(s.orderId)).status).toBe('cancelled')
+    })
+  })
+
+  describe('concurrency: payment callback vs manual refund on the same order', () => {
+    const waitUntilBlocked = async (marker: string) => {
+      for (let i = 0; i < 100; i++) {
+        const w = await one<{ c: number }>(
+          `select count(*)::int c from pg_stat_activity where wait_event_type = 'Lock' and query like $1`,
+          [`%${marker}%`]
+        )
+        if (w.c > 0) return true
+        await new Promise((r) => setTimeout(r, 20))
+      }
+      return false
+    }
+
+    it('cannot deadlock: both lock the order before the payment', async () => {
+      const s = await seed({ variant: true })
+      await finalize(s)
+      const pay = await one<{ id: string }>(`select id from public.payments where order_id = $1`, [s.orderId])
+
+      // Connection A replays finalize_paid_order's lock sequence: order, then payment.
+      const a = await pool.connect()
+      let callbackError: unknown = null
+      try {
+        await a.query('begin')
+        await a.query(`select id from public.orders where id = $1 for update`, [s.orderId])
+        const refund = pool
+          .query(`select public.record_manual_refund($1, null, 'REF-DEADLOCK') as r /* refund-race */`, [pay.id])
+          .then((r) => r.rows[0].r as { result: string }, (e: Error) => e)
+        expect(await waitUntilBlocked('refund-race')).toBe(true)
+        await a.query(`select id from public.payments where id = $1 for update`, [pay.id]).catch((e) => {
+          callbackError = e
+        })
+        await a.query(callbackError ? 'rollback' : 'commit')
+
+        const refundResult = await refund
+        expect(callbackError).toBeNull()
+        expect(refundResult).not.toBeInstanceOf(Error)
+        expect(refundResult).toMatchObject({ result: 'refunded' })
+      } finally {
+        a.release()
+      }
+      expect(await one(`select refund_state from public.payments where id = $1`, [pay.id])).toEqual({ refund_state: 'succeeded' })
+      expect((await order(s.orderId)).payment_status).toBe('refunded')
+    })
+
+    it('parallel replayed callbacks and refunds never error or double-apply', async () => {
+      const orders = await Promise.all(Array.from({ length: 10 }, () => seed({ variant: true })))
+      for (const s of orders) await finalize(s)
+      const pays = await Promise.all(
+        orders.map((s) => one<{ id: string }>(`select id from public.payments where order_id = $1`, [s.orderId]))
+      )
+
+      const results = await Promise.all(
+        orders.flatMap((s, i) => [
+          finalize(s).then((r) => r.result, (e: Error) => `error: ${e.message}`),
+          one(`select public.record_manual_refund($1, null, $2) as r`, [pays[i].id, `REF-${i}`]).then(
+            () => 'refunded',
+            (e: Error) => `error: ${e.message}`
+          ),
+        ])
+      )
+
+      expect(results.filter((r) => r.startsWith('error'))).toEqual([])
+      for (const s of orders) {
+        const o = await order(s.orderId)
+        expect(o.payment_status).toBe('refunded')
+        expect(await inv(s.sku)).toEqual({ quantity: 4, reserved_quantity: 0 }) // stock committed once
+      }
     })
   })
 

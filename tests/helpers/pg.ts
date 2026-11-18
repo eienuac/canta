@@ -25,3 +25,22 @@ export function createTestPool(): Pool {
   if (!url) throw new Error('TEST_DATABASE_URL is not set')
   return new Pool({ connectionString: url, max: 40 })
 }
+
+const MIGRATIONS_DIR = 'supabase/migrations'
+
+/** Drops the Supabase-like schemas and recreates them from tests/sql/supabase-stub.sql. */
+export async function resetSupabaseSchema(pool: Pool): Promise<void> {
+  const { readFileSync } = await import('node:fs')
+  await pool.query(`
+    drop schema if exists public cascade; create schema public;
+    drop schema if exists auth cascade; drop schema if exists storage cascade; drop schema if exists payload cascade;
+  `)
+  await pool.query(readFileSync('tests/sql/supabase-stub.sql', 'utf8'))
+}
+
+/** Applies the real migration files in order; `filter` selects which (by file name). */
+export async function applyMigrations(pool: Pool, filter: (file: string) => boolean = () => true): Promise<void> {
+  const { readFileSync, readdirSync } = await import('node:fs')
+  const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort().filter(filter)
+  for (const file of files) await pool.query(readFileSync(`${MIGRATIONS_DIR}/${file}`, 'utf8'))
+}
