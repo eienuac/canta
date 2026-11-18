@@ -164,11 +164,22 @@ export type Database = {
         installment: number | null
         provider_reference: string | null
         superseded_at: string | null
-        refund_state: 'none' | 'required' | 'requested' | 'processing' | 'succeeded' | 'failed'
+        refund_state: 'none' | 'required' | 'requested' | 'processing' | 'partial' | 'succeeded' | 'failed'
+        refunded_amount: number
         refund_reference: string | null
         refunded_at: string | null
         created_at: string
         updated_at: string
+      }>
+      payment_refunds: TableDef<{
+        id: string
+        payment_id: string
+        order_id: string
+        amount: number
+        reference: string
+        mode: 'manual' | 'api'
+        created_by: string | null
+        created_at: string
       }>
       reviews: TableDef<{
         id: string
@@ -266,7 +277,7 @@ export type Database = {
         Returns: Json
       }
       record_manual_refund: {
-        Args: { p_payment_id: string; p_admin_id: string | null; p_reference: string }
+        Args: { p_payment_id: string; p_admin_id: string | null; p_reference: string; p_amount?: number | null }
         Returns: Json
       }
     }

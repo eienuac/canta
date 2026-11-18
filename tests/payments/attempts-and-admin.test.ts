@@ -35,6 +35,7 @@ vi.mock('@/lib/admin', () => ({
 
 import { GET as CALLBACK } from '@/app/(frontend)/api/payments/callback/route'
 import { PATCH as ADMIN_ORDERS } from '@/app/(frontend)/api/app-admin/orders/route'
+import { PATCH as ADMIN_RETURNS } from '@/app/(frontend)/api/app-admin/returns/route'
 import { createCheckoutSession } from '@/services/orders'
 
 setupPaymentHarness()
@@ -182,6 +183,61 @@ describe('admin: payment review and manual refund', () => {
     expect(ok.status).toBe(200)
     expect(pay).toMatchObject({ refund_state: 'succeeded', refund_reference: 'IYZ-REF-123' })
     expect(order(o.id).payment_status).toBe('refunded')
+  })
+
+  it('a partial refund keeps the rest refundable and marks the order partially refunded', async () => {
+    asAdmin()
+    const o = seedPendingOrder(harness.db, { token: 'tok-1', total: 1000 })
+    harness.iyzico = iyzicoSuccess('1000.0')
+    await CALLBACK(callbackGetRequest('tok-1'))
+    const pay = payments(o.id)[0]
+
+    const partial = await patch({ action: 'record_refund', paymentId: pay.id, reference: 'IYZ-P1', amount: 250.5 })
+    expect(partial).toMatchObject({ status: 200, body: { ok: true, amount: 250.5, order_fully_refunded: false } })
+    expect(order(o.id).payment_status).toBe('partially_refunded')
+
+    const tooMuch = await patch({ action: 'record_refund', paymentId: pay.id, reference: 'IYZ-P2', amount: 800 })
+    expect(tooMuch).toEqual({ status: 400, body: { error: 'İade tutarı, bu ödemeden iade edilebilecek tutarı aşıyor.' } })
+
+    const rest = await patch({ action: 'record_refund', paymentId: pay.id, reference: 'IYZ-P3' })
+    expect(rest).toMatchObject({ status: 200, body: { amount: 749.5, order_fully_refunded: true } })
+    expect(order(o.id).payment_status).toBe('refunded')
+    expect(harness.db.tables.payment_refunds.map((r) => r.amount)).toEqual([250.5, 749.5])
+  })
+
+  it('refund amounts with more than 2 decimals are rejected', async () => {
+    asAdmin()
+    const res = await patch({ action: 'record_refund', paymentId: randomUUID(), reference: 'IYZ-X', amount: 10.005 })
+    expect(res.status).toBe(400)
+  })
+
+  it('marking a return refunded before the payment refund shows a clear message', async () => {
+    asAdmin()
+    harness.db.hooks['return_requests:update'] = () => ({
+      data: null,
+      error: { message: 'return cannot be marked refunded before the payment refund is recorded', code: '23514' },
+    })
+    const res = await ADMIN_RETURNS(
+      new Request('https://shop.test/api/app-admin/returns', {
+        method: 'PATCH',
+        body: JSON.stringify({ returnId: randomUUID(), status: 'refunded' }),
+      })
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({
+      error: 'Önce siparişin ödeme iadesini kaydedin; sonra iade talebi "Ücret iade edildi" yapılabilir.',
+    })
+  })
+
+  it('unknown return statuses are rejected', async () => {
+    asAdmin()
+    const res = await ADMIN_RETURNS(
+      new Request('https://shop.test/api/app-admin/returns', {
+        method: 'PATCH',
+        body: JSON.stringify({ returnId: randomUUID(), status: 'teleported' }),
+      })
+    )
+    expect(res.status).toBe(400)
   })
 
   it('a transition rejected by the database guard is shown as a Turkish message', async () => {

@@ -20,7 +20,7 @@ export default async function AdminOrderDetailPage({
   const { data: items } = await supabase.from('order_items').select('*').eq('order_id', id)
   const { data: payments } = await supabase
     .from('payments')
-    .select('id, status, amount, paid_price, installment, refund_state, refund_reference, superseded_at, created_at')
+    .select('id, status, amount, paid_price, refunded_amount, installment, refund_state, refund_reference, superseded_at, created_at')
     .eq('order_id', id)
     .order('created_at', { ascending: true })
 

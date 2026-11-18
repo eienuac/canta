@@ -33,6 +33,8 @@ export function createFakeSupabase() {
     cart_items: [],
     carts: [],
     profiles: [],
+    payment_refunds: [],
+    return_requests: [],
   }
   /** Per `table:op` hook: throw to simulate a transport failure, or return a result (e.g. `{ data: null, error }`) to simulate a database error. */
   const hooks: Record<string, (q: Query) => void | Result> = {}
@@ -204,19 +206,41 @@ export function createFakeSupabase() {
       })
       return { result: 'approved' }
     },
+    // Mirror of public.record_manual_refund (migration 010): full or partial refunds.
     record_manual_refund: (a) => {
-      if (!String(a.p_reference ?? '').trim()) throw new Error('refund reference is required')
+      const reference = String(a.p_reference ?? '').trim()
+      if (reference.length < 3) throw new Error('refund reference is required')
       const pay = tables.payments.find((p) => p.id === a.p_payment_id)
       if (!pay) throw new Error('payment not found')
-      if (pay.status !== 'paid' || pay.refund_state === 'succeeded') throw new Error('payment is not refundable')
-      Object.assign(pay, { refund_state: 'succeeded', refund_reference: String(a.p_reference).trim() })
-      const open = tables.payments.filter(
-        (p) => p.order_id === pay.order_id && p.status === 'paid' && p.refund_state !== 'succeeded'
-      ).length
+      const paid = Number(pay.paid_price ?? pay.amount)
+      const already = Number(pay.refunded_amount ?? 0)
+      const refundable = paid - already
+      if (pay.status !== 'paid' || refundable <= 0.001) throw new Error('payment is not refundable')
+      const amount = a.p_amount == null ? refundable : Number(a.p_amount)
+      if (amount <= 0 || amount > refundable + 0.001) throw new Error('refund amount exceeds the refundable amount')
+      if (tables.payment_refunds.some((r) => r.payment_id === pay.id && r.reference === reference)) {
+        throw new Error('refund reference already recorded')
+      }
+      tables.payment_refunds.push({ id: randomUUID(), payment_id: pay.id, order_id: pay.order_id, amount, reference })
+      const wasDuplicate = pay.refund_state === 'required'
+      const refunded = already + amount
+      Object.assign(pay, {
+        refunded_amount: refunded,
+        refund_reference: reference,
+        refund_state: refunded >= paid - 0.001 ? 'succeeded' : wasDuplicate ? 'required' : 'partial',
+      })
       const o = tables.orders.find((r) => r.id === pay.order_id)!
-      if (open === 0) Object.assign(o, { payment_status: 'refunded', needs_review: false })
-      else o.needs_review = tables.payments.some((p) => p.order_id === o.id && p.refund_state === 'required')
-      return { result: 'refunded', order_fully_refunded: open === 0 }
+      const remaining = tables.payments
+        .filter((p) => p.order_id === o.id && p.status === 'paid')
+        .reduce((sum, p) => sum + Number(p.paid_price ?? p.amount) - Number(p.refunded_amount ?? 0), 0)
+      if (['paid', 'partially_refunded'].includes(String(o.payment_status))) {
+        if (remaining <= 0.001) o.payment_status = 'refunded'
+        else if (!wasDuplicate) o.payment_status = 'partially_refunded'
+      }
+      o.needs_review =
+        o.status === 'payment_review' ||
+        tables.payments.some((p) => p.order_id === o.id && ['required', 'requested', 'processing', 'failed'].includes(String(p.refund_state)))
+      return { result: 'refunded', amount, payment_fully_refunded: refunded >= paid - 0.001, order_fully_refunded: remaining <= 0.001 }
     },
     // Mirrors public.rate_limit_hit: true while the key is within its limit.
     rate_limit_hit: ({ p_key, p_limit }) => {
