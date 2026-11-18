@@ -1,15 +1,11 @@
 import { nanoid } from 'nanoid'
 import { PublicError } from '@/lib/errors'
+import type { OrderStatus } from '@/types/database'
 import { z } from 'zod'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { assertCartAccess, getCartWithProducts } from '@/services/cart'
 import { validateCoupon } from '@/services/coupons'
-import {
-  commitStock,
-  decrementCmsStock,
-  releaseStock,
-  reserveStock,
-} from '@/services/inventory/sync'
+import { releaseStock, reserveStock } from '@/services/inventory/sync'
 import { calculateShipping } from '@/services/shipping'
 import { getPaymentProvider } from '@/services/payment'
 import { absoluteUrl } from '@/lib/utils'
@@ -126,16 +122,27 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
         ],
         callbackUrl: absoluteUrl('/api/payments/callback'),
       })
-      // Keep the stored checkout token in sync with the newest initialize call
+      // Every initialize is its own attempt with its own token. Earlier tokens are kept
+      // (marked superseded) so a payment completed on an older page is still matched,
+      // recorded and — if the order was already paid — flagged for refund.
       if (paymentInit.providerPaymentId) {
+        const now = new Date().toISOString()
         await supabase
           .from('payments')
-          .update({
-            provider_payment_id: paymentInit.providerPaymentId,
-            updated_at: new Date().toISOString(),
-          })
+          .update({ superseded_at: now, updated_at: now })
           .eq('order_id', existing.id)
           .eq('status', 'pending')
+        const { error: attemptError } = await supabase.from('payments').insert({
+          order_id: existing.id,
+          provider: provider.name,
+          provider_payment_id: paymentInit.providerPaymentId,
+          amount: Number(existing.total),
+          currency: 'TRY',
+          status: 'pending',
+          raw_response: (paymentInit.raw as import('@/types/database').Json) ?? null,
+          idempotency_key: `${data.idempotencyKey}:payment:${nanoid(10)}`,
+        })
+        if (attemptError) throw attemptError
       }
       return { order: existing, payment: paymentInit, reused: true as const }
     }
@@ -325,12 +332,6 @@ export async function createCheckoutSession(input: z.infer<typeof checkoutSchema
 
 const PENDING_ORDER_TTL_MS = 30 * 60 * 1000
 
-type OrderRow = import('@/types/database').Database['public']['Tables']['orders']['Row']
-
-function appendNote(existing: string | null | undefined, note: string) {
-  return existing ? `${existing};${note}` : note
-}
-
 /**
  * Atomically moves a still-pending order to cancelled/failed and releases its stock
  * reservation exactly once. Returns false if somebody else already moved it
@@ -434,6 +435,7 @@ export type CheckoutFormOutcome =
   | { kind: 'unverified'; orderId: string }
   | { kind: 'mismatch'; orderId: string }
   | { kind: 'paid'; orderId: string }
+  | { kind: 'review'; orderId: string }
   | { kind: 'failed'; orderId: string }
   | { kind: 'pending'; orderId: string }
 
@@ -467,15 +469,19 @@ export async function processCheckoutFormToken(token: string): Promise<CheckoutF
   }
 
   if (verified.status === 'paid') {
-    await finalizePaidOrder({
+    const result = await finalizePaidOrder({
       orderId,
       token,
       providerPaymentId: verified.providerPaymentId,
       amount: verified.amount,
+      price: verified.price,
+      installment: verified.installment,
       currency: verified.currency,
       raw: verified.raw,
     })
-    return { kind: 'paid', orderId }
+    // The customer has paid in every case below; 'review' means we hold the order for a
+    // manual check (amount, late or duplicate payment, stock) instead of completing it.
+    return result.result === 'review' ? { kind: 'review', orderId } : { kind: 'paid', orderId }
   }
 
   if (verified.status === 'failed') {
@@ -507,7 +513,30 @@ export async function markOrderPaymentFailed(params: {
     return { ok: true, ignored: true as const }
   }
 
-  if (params.token) await assertTokenBelongsToOrder(order.id, params.token)
+  const now = new Date().toISOString()
+  if (params.token) {
+    await assertTokenBelongsToOrder(order.id, params.token)
+    const { data: attempt } = await supabase
+      .from('payments')
+      .select('id, superseded_at')
+      .eq('order_id', order.id)
+      .eq('provider_payment_id', params.token)
+      .limit(1)
+      .maybeSingle()
+    // A failed OLD attempt must not cancel the order while a newer attempt is open.
+    if (attempt?.superseded_at) {
+      await supabase
+        .from('payments')
+        .update({
+          status: 'failed',
+          raw_response: (params.raw as import('@/types/database').Json) ?? null,
+          updated_at: now,
+        })
+        .eq('id', attempt.id)
+        .eq('status', 'pending')
+      return { ok: true, duplicate: false, supersededAttempt: true as const }
+    }
+  }
 
   const cancelled = await cancelPendingOrder(order.id)
 
@@ -518,158 +547,131 @@ export async function markOrderPaymentFailed(params: {
     .update({
       status: 'failed',
       raw_response: (params.raw as import('@/types/database').Json) ?? null,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
     .eq('order_id', order.id)
-    .neq('status', 'paid')
+    .eq('status', 'pending')
 
   return { ok: true, duplicate: !cancelled }
 }
 
-export async function finalizePaidOrder(params: {
-  orderId: string
-  /** iyzico checkout-form token (verified against the token we stored at initialize) */
-  token?: string
-  providerPaymentId?: string
-  amount?: number
-  currency?: string
-  raw?: unknown
-  /** @deprecated idempotency is now enforced by an atomic paid-claim on the order */
-  webhookIdempotencyKey?: string
-}) {
-  const supabase = getSupabaseAdmin()
-
-  const { data: order } = await supabase.from('orders').select('*').eq('id', params.orderId).single()
-  if (!order) throw new Error('Order not found')
-
-  if (order.payment_status === 'paid') {
-    return { ok: true, duplicate: true }
-  }
-
-  // Amount MUST be provided by the (verified) provider response and match exactly.
-  if (params.amount == null || !Number.isFinite(params.amount)) {
-    throw new Error('Payment amount missing')
-  }
-  if (Math.abs(Number(params.amount) - Number(order.total)) > 0.01) {
-    throw new Error('Payment amount mismatch')
-  }
-  if (params.currency && params.currency.toUpperCase() !== String(order.currency).toUpperCase()) {
-    throw new Error('Payment currency mismatch')
-  }
-
-  // The checkout token must be the one we issued for THIS order.
-  if (params.token) await assertTokenBelongsToOrder(order.id, params.token)
-
-  // Atomic claim: only one concurrent caller can flip the order to paid.
-  // 1) normal path — stock is still reserved
-  const now = new Date().toISOString()
-  let lateReleased = false
-  let { data: claimed } = await supabase
-    .from('orders')
-    .update({ status: 'payment_received', payment_status: 'paid', updated_at: now })
-    .eq('id', order.id)
-    .eq('payment_status', 'pending')
-    .select('id')
-    .maybeSingle()
-  // 2) late payment on an order we already cancelled/expired — reservation was released
-  if (!claimed) {
-    const late = await supabase
-      .from('orders')
-      .update({ status: 'payment_received', payment_status: 'paid', updated_at: now })
-      .eq('id', order.id)
-      .eq('payment_status', 'failed')
-      .select('id')
-      .maybeSingle()
-    claimed = late.data
-    lateReleased = Boolean(claimed)
-  }
-  if (!claimed) {
-    return { ok: true, duplicate: true }
-  }
-
-  await supabase
-    .from('payments')
-    // provider_payment_id keeps the checkout token we issued: later callbacks / webhooks for
-    // this payment are matched by it. The iyzico paymentId stays available in raw_response.
-    .update({
-      status: 'paid',
-      raw_response: (params.raw as import('@/types/database').Json) ?? null,
-      updated_at: now,
-    })
-    .eq('order_id', order.id)
-
-  // From here on the customer HAS paid: never throw — flag problems for manual follow-up.
-  const problems: string[] = []
-  const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id)
-
-  for (const item of items ?? []) {
-    const sku = item.product_sku_snapshot
-    try {
-      if (lateReleased) {
-        const reservedAgain = await reserveStock(sku, item.quantity, `late:${order.id}:reserve:${sku}`)
-        if (!reservedAgain) {
-          problems.push(`STOK_YETERSIZ:${sku}`)
-          continue
-        }
-      }
-      const committed = await commitStock(sku, item.quantity, order.id, `order:${order.id}:commit:${sku}`)
-      if (!committed) {
-        problems.push(`COMMIT_BASARISIZ:${sku}`)
-        continue
-      }
-      const decremented = await decrementCmsStock(sku, item.quantity)
-      if (!decremented) problems.push(`CMS_STOK_DUSULMEDI:${sku}`)
-    } catch (err) {
-      console.error('[finalizePaidOrder] stock step failed', sku, err instanceof Error ? err.message : '')
-      problems.push(`STOK_HATASI:${sku}`)
-    }
-  }
-
-  if (problems.length) {
-    console.error('[finalizePaidOrder] needs attention', { orderId: order.id, problems })
-    await supabase
-      .from('orders')
-      .update({ notes: appendNote(order.notes, `ATTENTION:${problems.join(',')}`) })
-      .eq('id', order.id)
-  }
-
-  if (order.coupon_code) {
-    const { data: coupon } = await supabase
-      .from('coupons')
-      .select('id')
-      .eq('code', order.coupon_code)
-      .maybeSingle()
-    if (coupon) {
-      await supabase.from('coupon_usages').insert({
-        coupon_id: coupon.id,
-        user_id: order.user_id,
-        order_id: order.id,
-        guest_email: order.guest_email,
-      })
-    }
-  }
-
-  // Clear the cart after successful payment (user or guest)
-  const cartId = (order as OrderRow).cart_id || cartIdFromNotes(order.notes)
-  if (cartId) {
-    await supabase.from('cart_items').delete().eq('cart_id', cartId)
-  } else if (order.user_id) {
-    const { data: cart } = await supabase
-      .from('carts')
-      .select('id')
-      .eq('user_id', order.user_id)
-      .maybeSingle()
-    if (cart) {
-      await supabase.from('cart_items').delete().eq('cart_id', cart.id)
-    }
-  }
-
-  return { ok: true, duplicate: false }
+export type FinalizeResult = {
+  ok: true
+  result: 'paid' | 'duplicate' | 'duplicate_payment' | 'review'
+  reason?: string
+  /** @deprecated kept for existing callers; true when nothing new was recorded */
+  duplicate: boolean
 }
 
-function cartIdFromNotes(notes: string | null | undefined): string | null {
-  const first = typeof notes === 'string' ? notes.split(';')[0] : null
-  return first && first.startsWith('cart_id:') ? first.slice('cart_id:'.length) : null
+/**
+ * Records a verified payment and completes the order in ONE database transaction
+ * (public.finalize_paid_order, migration 008): payment row, inventory commit, Payload CMS
+ * stock, coupon usage and cart cleanup. Inconsistent payments (amount, currency, late or
+ * duplicate payment, stock shortage) are kept and the order is put in `payment_review`.
+ */
+export async function finalizePaidOrder(params: {
+  orderId: string
+  /** iyzico checkout-form token we issued (required except for signed webhooks) */
+  token?: string
+  /** provider payment id */
+  providerPaymentId?: string
+  /** amount charged (paidPrice; may include installment interest) */
+  amount?: number
+  /** basket price reported by the provider; defaults to `amount` when the provider omits it */
+  price?: number
+  installment?: number
+  currency?: string
+  raw?: unknown
+  /** @deprecated idempotency is enforced in the database function */
+  webhookIdempotencyKey?: string
+}): Promise<FinalizeResult> {
+  const supabase = getSupabaseAdmin()
+  const num = (v: number | undefined) => (v != null && Number.isFinite(v) ? v : null)
+
+  const { data, error } = await supabase.rpc('finalize_paid_order', {
+    p_order_id: params.orderId,
+    p_token: params.token ?? null,
+    p_provider_reference: params.providerPaymentId ?? null,
+    p_price: num(params.price ?? params.amount),
+    p_paid_price: num(params.amount),
+    p_currency: params.currency ?? null,
+    p_installment: num(params.installment),
+    p_summary: (params.raw as import('@/types/database').Json) ?? {},
+  })
+  if (error) throw new Error(`finalize_paid_order failed: ${error.message}`)
+
+  const outcome = (data ?? {}) as { result?: FinalizeResult['result']; reason?: string }
+  const result = outcome.result ?? 'paid'
+  if (result === 'review' || result === 'duplicate_payment') {
+    console.error('[finalizePaidOrder] payment needs review', {
+      orderId: params.orderId,
+      result,
+      reason: outcome.reason,
+    })
+  }
+  return { ok: true, result, reason: outcome.reason, duplicate: result === 'duplicate' }
+}
+
+// ---------------------------------------------------------------------------
+// Admin operations (order transitions are enforced by the orders_transition_guard trigger)
+// ---------------------------------------------------------------------------
+
+const ADMIN_ERROR_MESSAGES: Array<[RegExp, string]> = [
+  [/invalid order status transition/i, 'Bu durum geçişine izin verilmiyor.'],
+  [/invalid payment_status transition/i, 'Bu ödeme durumu geçişine izin verilmiyor.'],
+  [/paid with stock committed/i, 'Ödemesi alınmamış veya stoğu düşülmemiş sipariş bu duruma geçirilemez.'],
+  [/only be cancelled after a refund/i, 'Ödenmiş sipariş, iadesi kaydedilmeden iptal edilemez.'],
+  [/must be refunded first/i, '"İade edildi" durumu için önce ödeme iadesi kaydedilmelidir.'],
+  [/without a completed refund/i, 'Tamamlanmış bir iade kaydı olmadan sipariş iade edildi yapılamaz.'],
+  [/not awaiting payment review/i, 'Sipariş ödeme incelemesinde değil.'],
+  [/insufficient|cannot commit stock|CMS/i, 'Stok yetersiz; sipariş onaylanamadı. Ödemeyi iade edip siparişi iptal edin.'],
+  [/reference is required/i, 'iyzico iade referansı zorunludur.'],
+  [/not refundable/i, 'Bu ödeme iade edilebilir durumda değil.'],
+]
+
+function adminError(error: { message?: string } | null | undefined, fallback: string): PublicError {
+  const message = error?.message ?? ''
+  const match = ADMIN_ERROR_MESSAGES.find(([re]) => re.test(message))
+  if (!match) console.error('[orders.admin]', message)
+  return new PublicError(match ? match[1] : fallback)
+}
+
+export async function adminUpdateOrderStatus(params: {
+  orderId: string
+  status: OrderStatus
+  trackingNumber?: string | null
+}) {
+  const supabase = getSupabaseAdmin()
+  const { error } = await supabase
+    .from('orders')
+    .update({
+      status: params.status,
+      tracking_number: params.trackingNumber || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', params.orderId)
+  if (error) throw adminError(error, 'Sipariş güncellenemedi.')
+}
+
+/** Completes a `payment_review` order: commits stock (or fails without changing anything). */
+export async function approvePaymentReview(orderId: string, adminId: string, note?: string) {
+  const { error } = await getSupabaseAdmin().rpc('approve_payment_review', {
+    p_order_id: orderId,
+    p_admin_id: adminId,
+    p_note: note?.trim() || null,
+  })
+  if (error) throw adminError(error, 'Sipariş onaylanamadı.')
+}
+
+/** Records a refund that was made manually in the iyzico panel (full refund of one payment). */
+export async function recordManualRefund(paymentId: string, adminId: string, reference: string) {
+  const { data, error } = await getSupabaseAdmin().rpc('record_manual_refund', {
+    p_payment_id: paymentId,
+    p_admin_id: adminId,
+    p_reference: reference,
+  })
+  if (error) throw adminError(error, 'İade kaydedilemedi.')
+  return data as { result: string; order_fully_refunded: boolean }
 }
 
 export async function getOrderById(orderId: string) {

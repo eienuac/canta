@@ -33,6 +33,42 @@ const REDACTED_PROVIDER_KEYS = [
   'checkoutFormContent',
 ]
 
+/**
+ * Whitelisted view of a checkout-form result: what we need for reconciliation, disputes and
+ * refunds (paymentTransactionId per item), nothing about the card or the buyer.
+ */
+export function summarizeCheckoutFormResult(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== 'object') return {}
+  const r = raw as Record<string, unknown>
+  const pick = (...keys: string[]) =>
+    Object.fromEntries(keys.filter((k) => r[k] !== undefined && r[k] !== null).map((k) => [k, r[k]]))
+  const items = Array.isArray(r.itemTransactions)
+    ? (r.itemTransactions as Array<Record<string, unknown>>).map((t) => ({
+        itemId: t.itemId,
+        paymentTransactionId: t.paymentTransactionId,
+        price: t.price,
+        paidPrice: t.paidPrice,
+      }))
+    : undefined
+  return {
+    ...pick(
+      'status',
+      'errorCode',
+      'paymentId',
+      'paymentStatus',
+      'fraudStatus',
+      'price',
+      'paidPrice',
+      'currency',
+      'installment',
+      'basketId',
+      'conversationId',
+      'token'
+    ),
+    ...(items ? { itemTransactions: items } : {}),
+  }
+}
+
 export function redactProviderPayload<T>(raw: T): T {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw
   const copy = { ...(raw as Record<string, unknown>) }
@@ -240,7 +276,13 @@ export class IyzicoPaymentProvider implements PaymentProvider {
       paymentPageUrl: raw.paymentPageUrl,
       token: raw.token,
       providerPaymentId: raw.token,
-      raw: redactProviderPayload(raw),
+      raw: {
+        status: raw.status,
+        token: raw.token,
+        paymentPageUrl: raw.paymentPageUrl,
+        tokenExpireTime: raw.tokenExpireTime,
+        conversationId: raw.conversationId,
+      },
     }
   }
 
@@ -287,8 +329,10 @@ export class IyzicoPaymentProvider implements PaymentProvider {
           token: token || undefined,
           status: paid ? 'paid' : failed ? 'failed' : 'pending',
           amount: retrieved.paidPrice != null ? Number(retrieved.paidPrice) : undefined,
+          price: retrieved.price != null ? Number(retrieved.price) : undefined,
+          installment: retrieved.installment != null ? Number(retrieved.installment) : undefined,
           currency: retrieved.currency ? String(retrieved.currency) : undefined,
-          raw: redactProviderPayload(retrieved),
+          raw: summarizeCheckoutFormResult(retrieved),
         }
       }
     } catch (err) {

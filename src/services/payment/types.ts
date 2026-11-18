@@ -41,7 +41,11 @@ export type WebhookVerificationResult = {
   /** CF token from callback / retrieve */
   token?: string
   status?: 'paid' | 'failed' | 'pending'
+  /** Amount actually charged (may include installment interest). */
   amount?: number
+  /** Basket price the provider charged for (compared with the order total). */
+  price?: number
+  installment?: number
   currency?: string
   raw?: unknown
 }

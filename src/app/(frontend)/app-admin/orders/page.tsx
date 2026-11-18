@@ -28,6 +28,7 @@ export default async function AdminOrdersPage() {
               </Link>
               <p className="text-xs text-muted">
                 {ORDER_STATUS_LABELS[o.status] || o.status} · {o.payment_status}
+                {o.needs_review && <span className="ml-2 font-medium text-amber-700">· İnceleme gerekiyor</span>}
               </p>
             </div>
             <span>{formatPrice(Number(o.total))}</span>

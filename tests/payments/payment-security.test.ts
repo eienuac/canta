@@ -22,9 +22,6 @@ const cartState = vi.hoisted(() => ({ cart: null as unknown as Record<string, un
 
 vi.mock('@/lib/supabase/admin', () => import('../helpers/mocks/supabase-admin'))
 vi.mock('@/lib/payload', () => import('../helpers/mocks/payload'))
-vi.mock('@/services/inventory/sync', async (orig) =>
-  (await import('../helpers/mocks/inventory-sync')).withStubbedCmsStock(orig)
-)
 vi.mock('@/services/cart', () => ({
   assertCartAccess: async () => true,
   getCartWithProducts: async () => structuredClone(cartState.cart),
@@ -162,29 +159,42 @@ describe('replayed callbacks', () => {
   })
 })
 
-describe('amount and currency validation', () => {
+describe('amount and currency validation (H1)', () => {
   it.each([
-    ['underpaid', '999.0', 'TRY'],
-    ['overpaid (installment commission, see H1)', '1045.5', 'TRY'],
-    ['wrong currency', '1000.0', 'USD'],
-  ])('%s → order is not marked paid', async (_label, paidPrice, currency) => {
+    ['underpaid', '999.0', '999.0', 'TRY', 'AMOUNT_MISMATCH'],
+    ['charged less than the basket price', '1000.0', '990.0', 'TRY', 'PAID_LESS_THAN_PRICE'],
+    ['wrong currency', '1000.0', '1000.0', 'USD', 'CURRENCY_MISMATCH'],
+  ])('%s → payment kept, order held for review, no stock change', async (_label, price, paidPrice, currency, reason) => {
     const o = seed('tok-1', 1000)
-    harness.iyzico = iyzicoSuccess(paidPrice, { currency })
+    harness.iyzico = iyzicoSuccess(paidPrice, { price, currency })
 
     const res = await callbackGet('tok-1')
 
-    expect(location(res)).toContain('reason=finalize')
-    expect(order(o.id).payment_status).toBe('pending')
+    expect(location(res)).toContain(`/checkout/success?orderId=${o.id}`)
+    expect(order(o.id)).toMatchObject({ status: 'payment_review', payment_status: 'paid', review_reason: reason })
+    expect(harness.db.tables.payments[0]).toMatchObject({ status: 'paid' })
     expect(commitCount(harness.db)).toBe(0)
   })
 
-  it('a SUCCESS without paidPrice is not accepted', async () => {
+  it('installment interest (paidPrice > price) completes the order normally', async () => {
+    const o = seed('tok-1', 1000)
+    harness.iyzico = iyzicoSuccess('1045.5', { price: '1000.0', installment: 6 })
+
+    await callbackGet('tok-1')
+
+    expect(order(o.id)).toMatchObject({ status: 'payment_received', payment_status: 'paid' })
+    expect(harness.db.tables.payments[0]).toMatchObject({ price: 1000, paid_price: 1045.5, installment: 6 })
+    expect(commitCount(harness.db)).toBe(1)
+  })
+
+  it('a SUCCESS without amounts is held for review, never completed', async () => {
     const o = seed('tok-1')
     harness.iyzico = (b) => ({ status: 'success', paymentStatus: 'SUCCESS', token: b.token, currency: 'TRY' })
 
     await callbackGet('tok-1')
 
-    expect(order(o.id).payment_status).toBe('pending')
+    expect(order(o.id)).toMatchObject({ status: 'payment_review', payment_status: 'paid' })
+    expect(commitCount(harness.db)).toBe(0)
   })
 })
 

@@ -12,9 +12,12 @@ export function seedPendingOrder(
   const sku = opts.sku ?? `SKU-${id.slice(0, 4)}`
   const total = opts.total ?? 1000
   const orderNumber = `SC${id.slice(0, 6)}`
+  const idempotencyKey = `idem-${id}`
   if (!db.tables.inventory.some((r) => r.sku === sku)) {
     db.tables.inventory.push({ sku, quantity: opts.stock ?? 5, reserved_quantity: 1 })
   }
+  // the reservation createCheckoutSession made for this order
+  db.tables.inventory_ledger.push({ sku, delta: 1, reason: 'reserve', idempotency_key: `${idempotencyKey}:reserve:${sku}` })
   db.tables.orders.push({
     id,
     order_number: orderNumber,
@@ -27,6 +30,7 @@ export function seedPendingOrder(
     coupon_code: null,
     user_id: null,
     guest_email: 'g@test.local',
+    idempotency_key: idempotencyKey,
     created_at: new Date().toISOString(),
   })
   db.tables.order_items.push({ id: randomUUID(), order_id: id, product_sku_snapshot: sku, quantity: 1 })

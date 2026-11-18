@@ -36,7 +36,9 @@ export default async function CheckoutSuccessPage({
     <div className="container-page py-24 text-center">
       <h1 className="font-display text-4xl text-espresso">Siparişiniz alındı</h1>
       <p className="mx-auto mt-4 max-w-md text-muted">
-        Ödemeniz doğrulandı. Sipariş detaylarını hesabınızdan takip edebilirsiniz.
+        {order?.status === 'payment_review'
+          ? 'Ödemeniz alındı. Siparişiniz kısa bir kontrolün ardından hazırlanacak; gerekirse sizinle iletişime geçeceğiz.'
+          : 'Ödemeniz doğrulandı. Sipariş detaylarını hesabınızdan takip edebilirsiniz.'}
       </p>
       {order && (
         <div className="mx-auto mt-8 max-w-md border border-border bg-ivory p-6 text-left text-sm">
