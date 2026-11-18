@@ -1,6 +1,13 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import {
+  MAINTENANCE_COOKIE,
+  MAINTENANCE_COOKIE_MAX_AGE,
+  MAINTENANCE_HTML,
+  MAINTENANCE_QUERY,
+  maintenanceDecision,
+} from '@/lib/maintenance'
 
 const isDev = process.env.NODE_ENV !== 'production'
 
@@ -28,8 +35,46 @@ function buildCsp(nonce: string) {
   ].join('; ')
 }
 
+/** Maintenance mode (MAINTENANCE_MODE / MAINTENANCE_BYPASS_TOKEN, see src/lib/maintenance.ts). */
+function maintenanceResponse(request: NextRequest): NextResponse | null {
+  const decision = maintenanceDecision({
+    pathname: request.nextUrl.pathname,
+    queryToken: request.nextUrl.searchParams.get(MAINTENANCE_QUERY),
+    cookie: request.cookies.get(MAINTENANCE_COOKIE)?.value ?? null,
+  })
+  if (decision.action === 'pass') return null
+
+  if (decision.action === 'grant') {
+    // Remember this browser, then reload the same page without the secret in the URL.
+    const clean = request.nextUrl.clone()
+    clean.searchParams.delete(MAINTENANCE_QUERY)
+    const response = NextResponse.redirect(clean)
+    response.cookies.set(MAINTENANCE_COOKIE, decision.cookieValue, {
+      httpOnly: true,
+      secure: !isDev,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: MAINTENANCE_COOKIE_MAX_AGE,
+    })
+    response.headers.set('Cache-Control', 'no-store')
+    return response
+  }
+
+  const headers = { 'Retry-After': '3600', 'Cache-Control': 'no-store' }
+  if (decision.api) {
+    return NextResponse.json({ error: 'Mağaza kısa bir bakımda. Lütfen daha sonra tekrar deneyin.' }, { status: 503, headers })
+  }
+  return new NextResponse(MAINTENANCE_HTML, {
+    status: 503,
+    headers: { ...headers, 'Content-Type': 'text/html; charset=utf-8' },
+  })
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  const closed = maintenanceResponse(request)
+  if (closed) return closed
 
   // Let Payload admin/API handle its own auth (its bundle needs inline/eval, so no strict CSP)
   if (pathname.startsWith('/admin') || pathname.startsWith('/api/payload')) {
