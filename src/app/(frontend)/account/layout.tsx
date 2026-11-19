@@ -21,17 +21,17 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   const { user, loading, signOut } = useAuth()
   const pathname = usePathname()
   const guestOk = GUEST_ALLOWED.some((p) => pathname === p || pathname.startsWith(`${p}/`))
-  const [isAppAdmin, setIsAppAdmin] = useState(false)
+  /** Id of the user the admin check succeeded for, so a sign-out/switch resets it without an effect. */
+  const [adminUserId, setAdminUserId] = useState<string | null>(null)
+  const isAppAdmin = Boolean(user) && adminUserId === user?.id
 
   useEffect(() => {
-    if (!user) {
-      setIsAppAdmin(false)
-      return
-    }
+    if (!user) return
+    const userId = user.id
     fetch('/api/account/me')
       .then((r) => r.json())
-      .then((d) => setIsAppAdmin(Boolean(d.isAppAdmin)))
-      .catch(() => setIsAppAdmin(false))
+      .then((d) => setAdminUserId(d.isAppAdmin ? userId : null))
+      .catch(() => setAdminUserId(null))
   }, [user])
 
   if (loading) {

@@ -36,12 +36,10 @@ export function SearchDialog({
     return () => window.removeEventListener('keydown', handle)
   }, [open, onOpenChange])
 
+  const searchable = q.trim().length >= 2
+
   useEffect(() => {
-    if (!open) return
-    if (q.trim().length < 2) {
-      setData(null)
-      return
-    }
+    if (!open || !searchable) return
     const t = setTimeout(async () => {
       setLoading(true)
       try {
@@ -53,7 +51,7 @@ export function SearchDialog({
       }
     }, 280)
     return () => clearTimeout(t)
-  }, [q, open])
+  }, [q, open, searchable])
 
   if (!open) return null
 
@@ -70,7 +68,7 @@ export function SearchDialog({
         />
         <div className="mt-4 max-h-[60vh] overflow-y-auto">
           {loading && <p className="py-6 text-sm text-muted">Aranıyor…</p>}
-          {!loading && data && (
+          {!loading && searchable && data && (
             <div className="space-y-6">
               {data.categories.length > 0 && (
                 <div>

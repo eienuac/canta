@@ -21,18 +21,6 @@ type AuthParts = {
   }
 }
 
-/** Card metadata and the rendered form are never persisted (payments.raw_response). */
-const REDACTED_PROVIDER_KEYS = [
-  'binNumber',
-  'lastFourDigits',
-  'cardAssociation',
-  'cardFamily',
-  'cardType',
-  'cardUserKey',
-  'cardToken',
-  'checkoutFormContent',
-]
-
 /**
  * Whitelisted view of a checkout-form result: what we need for reconciliation, disputes and
  * refunds (paymentTransactionId per item), nothing about the card or the buyer.
@@ -69,11 +57,27 @@ export function summarizeCheckoutFormResult(raw: unknown): Record<string, unknow
   }
 }
 
-export function redactProviderPayload<T>(raw: T): T {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw
-  const copy = { ...(raw as Record<string, unknown>) }
-  for (const key of REDACTED_PROVIDER_KEYS) delete copy[key]
-  return copy as T
+/**
+ * iyzico webhook origin check (X-IYZ-SIGNATURE-V3), per https://docs.iyzico.com/en/advanced/webhook
+ *   HPP (Checkout Form / PWI): hex(HMAC_SHA256(secretKey, secretKey + iyziEventType + iyziPaymentId + token + paymentConversationId + status))
+ *   Direct:                     hex(HMAC_SHA256(secretKey, secretKey + iyziEventType + paymentId + paymentConversationId + status))
+ * The signature only proves the notification came from iyzico; the payment result itself is
+ * still retrieved from iyzico before any order changes.
+ */
+export function verifyIyzicoWebhookSignature(
+  payload: Record<string, unknown>,
+  signature: string,
+  secretKey = process.env.PAYMENT_SECRET_KEY?.trim()
+): boolean {
+  if (!secretKey || !signature) return false
+  const field = (k: string) => (payload[k] === undefined || payload[k] === null ? '' : String(payload[k]))
+  const message =
+    payload.token !== undefined && payload.token !== null
+      ? secretKey + field('iyziEventType') + field('iyziPaymentId') + field('token') + field('paymentConversationId') + field('status')
+      : secretKey + field('iyziEventType') + field('paymentId') + field('paymentConversationId') + field('status')
+  const expected = Buffer.from(createHmac('sha256', secretKey).update(message, 'utf8').digest('hex'))
+  const given = Buffer.from(signature.trim().toLowerCase())
+  return given.length === expected.length && timingSafeEqual(given, expected)
 }
 
 /**
@@ -286,93 +290,56 @@ export class IyzicoPaymentProvider implements PaymentProvider {
     }
   }
 
-  async verifyWebhook(headers: Headers, body: string): Promise<WebhookVerificationResult> {
-    const signature = headers.get('x-iyzico-signature') || headers.get('x-payment-signature')
-
-    // Checkout Form callback: body contains token → must retrieve from iyzico API
+  /**
+   * Verifies a Checkout Form result by retrieving it from iyzico with the token. Nothing in the
+   * caller's body except the token is trusted (the signed webhook is checked separately with
+   * verifyIyzicoWebhookSignature before it gets here).
+   */
+  async verifyWebhook(_headers: Headers, body: string): Promise<WebhookVerificationResult> {
+    let token: string
     try {
-      const parsed = JSON.parse(body) as {
-        token?: string
-        conversationId?: string
-        paymentStatus?: string
-        paidPrice?: string | number
-      }
+      const parsed = JSON.parse(body) as { token?: unknown }
+      if (typeof parsed?.token !== 'string' || !parsed.token) return { valid: false }
+      token = parsed.token
+    } catch {
+      return { valid: false }
+    }
 
-      if (!signature && parsed.token) {
-        const retrieved = await this.retrieveCheckoutForm(parsed.token)
-        console.info('[iyzico.verifyWebhook] CF retrieve', {
-          apiStatus: retrieved.status,
-          paymentStatus: retrieved.paymentStatus,
-          errorCode: retrieved.errorCode,
-          conversationId: retrieved.conversationId,
-        })
+    try {
+      const retrieved = await this.retrieveCheckoutForm(token)
+      console.info('[iyzico.verifyWebhook] CF retrieve', {
+        apiStatus: retrieved.status,
+        paymentStatus: retrieved.paymentStatus,
+        errorCode: retrieved.errorCode,
+        conversationId: retrieved.conversationId,
+      })
 
-        // Only the provider's own answer is trusted. Fields sent by the caller (e.g. a
-        // conversationId in the callback body) are ignored: the order is resolved from the
-        // token we issued (see processCheckoutFormToken).
-        const conversationId = retrieved.conversationId ? String(retrieved.conversationId) : undefined
-        const basketId = retrieved.basketId ? String(retrieved.basketId) : undefined
-        const token = String(parsed.token)
-        const paymentStatus = String(retrieved.paymentStatus || '').toUpperCase()
-        const apiOk = retrieved.status === 'success'
-        const tokenMatches = !retrieved.token || String(retrieved.token) === token
-        // An API error (unknown/expired token, outage) is NOT a payment failure: we could not
-        // verify anything, so nothing may change. Only an explicit FAILURE is a failed payment.
-        const paid = apiOk && paymentStatus === 'SUCCESS'
-        const failed = apiOk && (paymentStatus === 'FAILURE' || paymentStatus === 'FAILED')
+      const conversationId = retrieved.conversationId ? String(retrieved.conversationId) : undefined
+      const basketId = retrieved.basketId ? String(retrieved.basketId) : undefined
+      const paymentStatus = String(retrieved.paymentStatus || '').toUpperCase()
+      const apiOk = retrieved.status === 'success'
+      const tokenMatches = !retrieved.token || String(retrieved.token) === token
+      // An API error (unknown/expired token, outage) is NOT a payment failure: we could not
+      // verify anything, so nothing may change. Only an explicit FAILURE is a failed payment.
+      const paid = apiOk && paymentStatus === 'SUCCESS'
+      const failed = apiOk && (paymentStatus === 'FAILURE' || paymentStatus === 'FAILED')
 
-        return {
-          valid: apiOk && tokenMatches,
-          providerPaymentId: retrieved.paymentId ? String(retrieved.paymentId) : token || undefined,
-          orderId: conversationId,
-          basketId,
-          token: token || undefined,
-          status: paid ? 'paid' : failed ? 'failed' : 'pending',
-          amount: retrieved.paidPrice != null ? Number(retrieved.paidPrice) : undefined,
-          price: retrieved.price != null ? Number(retrieved.price) : undefined,
-          installment: retrieved.installment != null ? Number(retrieved.installment) : undefined,
-          currency: retrieved.currency ? String(retrieved.currency) : undefined,
-          raw: summarizeCheckoutFormResult(retrieved),
-        }
+      return {
+        valid: apiOk && tokenMatches,
+        providerPaymentId: retrieved.paymentId ? String(retrieved.paymentId) : token,
+        orderId: conversationId,
+        basketId,
+        token,
+        status: paid ? 'paid' : failed ? 'failed' : 'pending',
+        amount: retrieved.paidPrice != null ? Number(retrieved.paidPrice) : undefined,
+        price: retrieved.price != null ? Number(retrieved.price) : undefined,
+        installment: retrieved.installment != null ? Number(retrieved.installment) : undefined,
+        currency: retrieved.currency ? String(retrieved.currency) : undefined,
+        raw: summarizeCheckoutFormResult(retrieved),
       }
     } catch (err) {
-      console.error(
-        '[iyzico.verifyWebhook] token retrieve failed',
-        err instanceof Error ? err.message : 'unknown'
-      )
+      console.error('[iyzico.verifyWebhook] token retrieve failed', err instanceof Error ? err.message : 'unknown')
       return { valid: false }
-    }
-
-    const secret = process.env.PAYMENT_WEBHOOK_SECRET?.trim() || process.env.PAYMENT_SECRET_KEY?.trim()
-    if (!secret || !signature) {
-      console.warn('[iyzico.verifyWebhook] missing secret or signature')
-      return { valid: false }
-    }
-
-    const expected = createHmac('sha256', secret).update(body).digest('hex')
-    const a = Buffer.from(signature)
-    const b = Buffer.from(expected)
-    if (a.length !== b.length || !timingSafeEqual(a, b)) {
-      console.error('[iyzico.verifyWebhook] signature mismatch')
-      return { valid: false }
-    }
-
-    const parsed = JSON.parse(body) as {
-      conversationId?: string
-      paymentStatus?: string
-      token?: string
-      paidPrice?: string
-      paymentId?: string
-    }
-    const paymentStatus = String(parsed.paymentStatus || '').toUpperCase()
-
-    return {
-      valid: true,
-      providerPaymentId: parsed.paymentId || parsed.token,
-      orderId: parsed.conversationId,
-      status: paymentStatus === 'SUCCESS' ? 'paid' : 'failed',
-      amount: parsed.paidPrice ? Number(parsed.paidPrice) : undefined,
-      raw: redactProviderPayload(parsed),
     }
   }
 

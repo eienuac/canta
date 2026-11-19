@@ -10,20 +10,20 @@ import type { ProductCardDTO } from '@/types/product'
 export default function FavoritesPage() {
   const { user } = useAuth()
   const guest = useGuestFavorites()
-  const [ids, setIds] = useState<string[]>([])
+  const [userIds, setUserIds] = useState<string[]>([])
   const [items, setItems] = useState<ProductCardDTO[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Guests read favorites from local storage; signed-in users load them from the API.
+  const ids = user ? userIds : guest.ids
+
   useEffect(() => {
-    if (!user) {
-      setIds(guest.ids)
-      return
-    }
+    if (!user) return
     fetch('/api/favorites')
       .then((r) => r.json())
-      .then((d) => setIds((d.favorites || []).map((f: { product_id: string }) => f.product_id)))
-      .catch(() => setIds([]))
-  }, [user, guest.ids])
+      .then((d) => setUserIds((d.favorites || []).map((f: { product_id: string }) => f.product_id)))
+      .catch(() => setUserIds([]))
+  }, [user])
 
   useEffect(() => {
     let cancelled = false

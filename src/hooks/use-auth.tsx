@@ -22,8 +22,6 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
   const supabase = useMemo(() => {
     try {
       return createClient()
@@ -31,6 +29,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null
     }
   }, [])
+  const [user, setUser] = useState<User | null>(null)
+  // Without a client there is nothing to load.
+  const [loading, setLoading] = useState(() => supabase !== null)
 
   const refresh = useCallback(async () => {
     if (!supabase) {
@@ -44,8 +45,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase])
 
   useEffect(() => {
-    refresh()
     if (!supabase) return
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+      setLoading(false)
+    })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       setLoading(false)

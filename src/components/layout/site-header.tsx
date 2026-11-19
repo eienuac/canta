@@ -30,7 +30,9 @@ export function SiteHeader({
   const [open, setOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(initialIsAdmin)
+  /** Result of the client-side admin check, keyed by the user it was made for. */
+  const [adminCheck, setAdminCheck] = useState<{ userId: string; isAdmin: boolean } | null>(null)
+  const isAdmin = user ? (adminCheck?.userId === user.id ? adminCheck.isAdmin : initialIsAdmin) : false
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12)
@@ -40,18 +42,16 @@ export function SiteHeader({
   }, [])
 
   useEffect(() => {
-    if (!user) {
-      setIsAdmin(false)
-      return
-    }
+    if (!user) return
+    const userId = user.id
     let cancelled = false
     fetch('/api/account/admin-status')
       .then((r) => r.json())
       .then((data: { isAdmin?: boolean }) => {
-        if (!cancelled) setIsAdmin(Boolean(data.isAdmin))
+        if (!cancelled) setAdminCheck({ userId, isAdmin: Boolean(data.isAdmin) })
       })
       .catch(() => {
-        if (!cancelled) setIsAdmin(false)
+        if (!cancelled) setAdminCheck({ userId, isAdmin: false })
       })
     return () => {
       cancelled = true
