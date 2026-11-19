@@ -696,34 +696,4 @@ export async function listOrdersForUser(userId: string) {
   return data ?? []
 }
 
-/**
- * iyzico CF retrieve often omits conversationId. Resolve order via:
- * 1) conversationId (order UUID we sent at initialize)
- * 2) basketId (our order_number)
- * 3) CF token stored as payments.provider_payment_id at initialize
- */
-export async function resolveOrderIdFromPaymentResult(input: {
-  orderId?: string | null
-  basketId?: string | null
-  token?: string | null
-  providerPaymentId?: string | null
-}): Promise<string | null> {
-  if (input.orderId) return input.orderId
-
-  const supabase = getSupabaseAdmin()
-
-  if (input.basketId) {
-    const { data } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('order_number', input.basketId)
-      .maybeSingle()
-    if (data?.id) return data.id
-  }
-
-  if (input.token) return findOrderIdByCheckoutToken(input.token)
-
-  return null
-}
-
 export { ORDER_STATUS_LABELS } from '@/lib/labels'

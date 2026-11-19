@@ -3,7 +3,7 @@
  * forged approvals, replayed callbacks, unauthorized confirmation, amount/currency checks,
  * and the unchanged happy path (checkout → iyzico → callback).
  */
-import { randomUUID } from 'node:crypto'
+import { createHmac, randomUUID } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 import { commitCount, orderRow, seedPendingOrder, stockRow } from '../helpers/orders'
 import {
@@ -87,7 +87,7 @@ describe('forged payment approval', () => {
     const res = await WEBHOOK(
       webhookRequest(
         { conversationId: o.id, paymentStatus: 'SUCCESS', paidPrice: '1000.0' },
-        { 'x-iyzico-signature': 'f'.repeat(64) }
+        { 'x-iyz-signature-v3': 'f'.repeat(64) }
       )
     )
 
@@ -257,5 +257,98 @@ describe('happy path: checkout → iyzico → callback', () => {
     expect(order(session.order.id)).toMatchObject({ status: 'payment_received', payment_status: 'paid' })
     expect(stock('BAG-1')).toMatchObject({ quantity: 2, reserved_quantity: 0 })
     expect(harness.db.tables.cart_items.filter((i) => i.cart_id === cartId)).toHaveLength(0)
+  })
+})
+
+describe('iyzico webhook signature (X-IYZ-SIGNATURE-V3)', () => {
+  const SECRET = 'test-secret-key' // PAYMENT_SECRET_KEY in the harness
+  /** Formula from docs.iyzico.com/en/advanced/webhook (HPP format), computed independently here. */
+  const sign = (p: Record<string, string | number>, secret = SECRET) =>
+    createHmac('sha256', secret)
+      .update(`${secret}${p.iyziEventType}${p.iyziPaymentId}${p.token}${p.paymentConversationId}${p.status}`)
+      .digest('hex')
+  const hpp = (token: string, orderId: string, status = 'SUCCESS') => ({
+    paymentConversationId: orderId,
+    merchantId: '123456',
+    token,
+    status,
+    iyziReferenceCode: randomUUID(),
+    iyziEventType: 'CHECKOUT_FORM_AUTH',
+    iyziEventTime: 1763500000000,
+    iyziPaymentId: 27000001,
+  })
+  const signedWebhook = (body: ReturnType<typeof hpp>, signature = sign(body)) =>
+    WEBHOOK(webhookRequest(body, { 'X-IYZ-SIGNATURE-V3': signature }))
+
+  it('a correctly signed notification completes the order (after retrieving the result)', async () => {
+    const o = seed('tok-1')
+    harness.iyzico = iyzicoSuccess('1000.0')
+
+    const res = await signedWebhook(hpp('tok-1', o.id))
+
+    expect(res.status).toBe(200)
+    expect(order(o.id)).toMatchObject({ status: 'payment_received', payment_status: 'paid' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('an uppercase hex signature is accepted', async () => {
+    const o = seed('tok-1')
+    harness.iyzico = iyzicoSuccess('1000.0')
+    const body = hpp('tok-1', o.id)
+
+    expect((await signedWebhook(body, sign(body).toUpperCase())).status).toBe(200)
+  })
+
+  it('a signature made with another key, or over altered fields, is rejected without calling iyzico', async () => {
+    const o = seed('tok-1')
+    harness.iyzico = iyzicoSuccess('1000.0')
+    const body = hpp('tok-1', o.id)
+
+    expect((await signedWebhook(body, sign(body, 'attacker-key'))).status).toBe(401)
+    expect((await signedWebhook({ ...body, status: 'FAILURE' }, sign(body))).status).toBe(401)
+    expect(order(o.id).payment_status).toBe('pending')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('a valid signature does not let the body override what iyzico reports', async () => {
+    const o = seed('tok-1')
+    harness.iyzico = iyzicoFailure()
+
+    await signedWebhook(hpp('tok-1', o.id, 'SUCCESS'))
+
+    expect(order(o.id).payment_status).toBe('failed')
+  })
+
+  it('signed notifications for tokens or formats this shop does not use are acknowledged and ignored', async () => {
+    const unknown = hpp('not-ours', randomUUID())
+    expect(await (await signedWebhook(unknown)).json()).toEqual({ ok: true, ignored: true })
+
+    const direct = { iyziEventType: 'PAYMENT_API', paymentId: '1', paymentConversationId: 'x', status: 'SUCCESS' }
+    const directSig = createHmac('sha256', SECRET).update(`${SECRET}PAYMENT_API1xSUCCESS`).digest('hex')
+    const res = await WEBHOOK(webhookRequest(direct, { 'x-iyz-signature-v3': directSig }))
+    expect(await res.json()).toEqual({ ok: true, ignored: true })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('the old unofficial header is not a bypass: the result is still retrieved from iyzico', async () => {
+    const o = seed('tok-1')
+    harness.iyzico = iyzicoFailure()
+    const body = { token: 'tok-1', conversationId: o.id, paymentStatus: 'SUCCESS', paidPrice: '1000.0' }
+    const legacy = createHmac('sha256', SECRET).update(JSON.stringify(body)).digest('hex')
+
+    await WEBHOOK(webhookRequest(body, { 'x-iyzico-signature': legacy }))
+
+    expect(order(o.id).payment_status).toBe('failed')
+  })
+
+  it('with IYZICO_WEBHOOK_REQUIRE_SIGNATURE=true unsigned notifications are refused', async () => {
+    vi.stubEnv('IYZICO_WEBHOOK_REQUIRE_SIGNATURE', 'true')
+    const o = seed('tok-1')
+    harness.iyzico = iyzicoSuccess('1000.0')
+
+    expect((await WEBHOOK(webhookRequest({ token: 'tok-1' }))).status).toBe(401)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect((await signedWebhook(hpp('tok-1', o.id))).status).toBe(200)
+    expect(order(o.id).payment_status).toBe('paid')
   })
 })

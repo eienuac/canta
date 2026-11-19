@@ -102,6 +102,8 @@ export function SiteFooter({
       <div className="border-t border-border">
         <div className="container-page flex flex-col gap-4 py-8 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted">© {new Date().getFullYear()} {brandName}. Tüm hakları saklıdır.</p>
+          {/* Static SVG logo: next/image does not optimize SVGs, so a plain <img> is intended. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/payments/iyzico-logo-band.svg"
             alt="iyzico ile Öde, Visa, Mastercard, American Express ve Troy"

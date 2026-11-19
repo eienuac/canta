@@ -30,7 +30,6 @@ export function setupPaymentHarness() {
     vi.stubEnv('PAYMENT_PROVIDER', 'iyzico')
     vi.stubEnv('PAYMENT_API_KEY', 'test-api-key')
     vi.stubEnv('PAYMENT_SECRET_KEY', 'test-secret-key')
-    vi.stubEnv('PAYMENT_WEBHOOK_SECRET', 'test-webhook-secret')
     vi.stubEnv('IYZICO_BASE_URL', 'https://iyzico.test.invalid')
     vi.stubEnv('PAYLOAD_SECRET', 'test-payload-secret')
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://shop.test')

@@ -6,7 +6,7 @@ import Link from 'next/link'
 export function AdminAppLink() {
   return (
     <div className="nav-group" style={{ marginTop: '0.75rem', padding: '0 0.5rem' }}>
-      <a
+      <Link
         href="/"
         style={{
           display: 'block',
@@ -18,7 +18,7 @@ export function AdminAppLink() {
         }}
       >
         ← Siteye dön
-      </a>
+      </Link>
       <Link
         href="/app-admin"
         style={{
@@ -48,7 +48,7 @@ export function AdminAppLink() {
 /** Payload CMS header action — always visible, even when the sidebar is collapsed. */
 export function SiteLinkAction() {
   return (
-    <a
+    <Link
       href="/"
       style={{
         display: 'inline-flex',
@@ -64,7 +64,7 @@ export function SiteLinkAction() {
       }}
     >
       ← Siteye dön
-    </a>
+    </Link>
   )
 }
 

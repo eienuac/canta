@@ -36,4 +36,4 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withPayload(nextConfig as any)
+export default withPayload(nextConfig)

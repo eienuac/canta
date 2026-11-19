@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -44,11 +44,12 @@ export default function CheckoutPage() {
     postalCode: '',
   })
 
-  useEffect(() => {
-    if (user?.email && !form.email) {
-      setForm((f) => ({ ...f, email: user.email || '' }))
-    }
-  }, [user?.email, form.email])
+  // Prefill the e-mail once the session is known (auth loads after the first render).
+  const [prefilledFor, setPrefilledFor] = useState<string | null>(null)
+  if (user?.email && prefilledFor !== user.email) {
+    setPrefilledFor(user.email)
+    if (!form.email) setForm((f) => ({ ...f, email: user.email || '' }))
+  }
 
   // Do NOT call refresh() on mount — CartProvider already owns cart state.
   // A remount refresh was wiping a full cart with an empty user cart (~2s later).
@@ -245,6 +246,8 @@ export default function CheckoutPage() {
 
           {step >= 3 && (
             <div className="space-y-3 border border-border bg-ivory p-6 text-sm text-muted">
+              {/* Static SVG logo: next/image does not optimize SVGs, so a plain <img> is intended. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/payments/iyzico-ile-ode.svg"
                 alt="iyzico ile Öde"

@@ -16,19 +16,17 @@ export function FavoriteButton({
 }) {
   const { user } = useAuth()
   const guest = useGuestFavorites()
-  const [active, setActive] = useState(false)
+  const [userActive, setUserActive] = useState(false)
   const [loading, setLoading] = useState(false)
+  const active = user ? userActive : guest.has(productId)
 
   useEffect(() => {
-    if (!user) {
-      setActive(guest.has(productId))
-      return
-    }
+    if (!user) return
     fetch(`/api/favorites?productId=${productId}`)
       .then((r) => r.json())
-      .then((d) => setActive(Boolean(d.favorited)))
+      .then((d) => setUserActive(Boolean(d.favorited)))
       .catch(() => null)
-  }, [user, productId, guest])
+  }, [user, productId])
 
   async function toggle() {
     if (loading) return
@@ -36,7 +34,6 @@ export function FavoriteButton({
     try {
       if (!user) {
         const next = guest.toggle(productId)
-        setActive(next)
         toast.success(next ? 'Favorilere eklendi' : 'Favorilerden çıkarıldı')
         return
       }
@@ -53,7 +50,7 @@ export function FavoriteButton({
         console.error('[FavoriteButton]', msg, data)
         throw new Error(msg)
       }
-      setActive(Boolean(data.favorited))
+      setUserActive(Boolean(data.favorited))
       toast.success(data.favorited ? 'Favorilere eklendi' : 'Favorilerden çıkarıldı')
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Bir hata oluştu'
