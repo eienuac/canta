@@ -118,7 +118,7 @@ export default async function HomePage() {
         <div className="container-page relative flex min-h-[88vh] flex-col justify-end pb-20 pt-32 md:justify-center md:pb-24">
           <h1 className="flex flex-col gap-1 font-display text-taba md:flex-row md:items-baseline md:gap-8">
             <span className="sr-only">Seçkin Çanta </span>
-            <span className="text-4xl italic tracking-[0.25em] text-taba/80 md:text-6xl">Since</span>
+            <span className="text-5xl italic tracking-[0.2em] text-taba/90 md:text-7xl">Since</span>
             <span className="text-7xl tracking-[0.3em] md:text-9xl">1967</span>
           </h1>
           <div className="mt-10 flex flex-wrap gap-3">
