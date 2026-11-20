@@ -1,4 +1,5 @@
 import type { GlobalConfig } from 'payload'
+import { staffOnly } from '@/collections/access'
 
 export const Homepage: GlobalConfig = {
   slug: 'homepage',
@@ -8,6 +9,7 @@ export const Homepage: GlobalConfig = {
   },
   access: {
     read: () => true,
+    update: staffOnly,
   },
   fields: [
     {

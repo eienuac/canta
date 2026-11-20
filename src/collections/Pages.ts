@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { slugField } from '@/fields/auto'
+import { publishedOrStaff, staffWrite } from './access'
 
 export const Pages: CollectionConfig = {
   slug: 'pages',
@@ -15,10 +16,8 @@ export const Pages: CollectionConfig = {
     drafts: true,
   },
   access: {
-    read: ({ req }) => {
-      if (req.user) return true
-      return { _status: { equals: 'published' } }
-    },
+    read: publishedOrStaff,
+    ...staffWrite,
   },
   fields: [
     {

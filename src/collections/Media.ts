@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { staffWrite } from './access'
 
 function altFromFilename(filename: unknown) {
   if (typeof filename !== 'string' || !filename) return null
@@ -14,6 +15,7 @@ export const Media: CollectionConfig = {
   },
   access: {
     read: () => true,
+    ...staffWrite,
   },
   admin: {
     group: 'İçerik',

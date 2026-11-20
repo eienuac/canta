@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { listProducts, getHomepageContent } from '@/services/products'
 import { ProductCard } from '@/components/product/product-card'
 import { Button } from '@/components/ui/button'
+import { STORE_LOCATION } from '@/lib/store-location'
 import type { Homepage, Product } from '@/payload-types'
 import type { ProductCardDTO } from '@/types/product'
 
@@ -115,8 +116,10 @@ export default async function HomePage() {
         </div>
 
         <div className="container-page relative flex min-h-[88vh] flex-col justify-end pb-20 pt-32 md:justify-center md:pb-24">
-          <h1 className="font-display text-7xl tracking-[0.3em] text-taba md:text-9xl">
-            <span className="sr-only">Seçkin Çanta </span>1967
+          <h1 className="flex flex-col gap-1 font-display text-taba md:flex-row md:items-baseline md:gap-8">
+            <span className="sr-only">Seçkin Çanta </span>
+            <span className="text-4xl italic tracking-[0.25em] text-taba/80 md:text-6xl">Since</span>
+            <span className="text-7xl tracking-[0.3em] md:text-9xl">1967</span>
           </h1>
           <div className="mt-10 flex flex-wrap gap-3">
             <Link href={hero?.primaryCta?.href || '/products'}>
@@ -198,6 +201,38 @@ export default async function HomePage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="container-page grid items-center gap-10 py-20 md:grid-cols-[2fr_3fr]">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.2em] text-muted">Mağazamız</p>
+          <h2 className="mt-3 font-display text-4xl text-espresso md:text-5xl">Ulus’tayız</h2>
+          <address className="mt-6 text-muted not-italic leading-relaxed">
+            {STORE_LOCATION.addressLines.map((line) => (
+              <span key={line} className="block">
+                {line}
+              </span>
+            ))}
+          </address>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <a href={STORE_LOCATION.directionsUrl} target="_blank" rel="noreferrer">
+              <Button>Yol tarifi al</Button>
+            </a>
+            <a href={STORE_LOCATION.mapsUrl} target="_blank" rel="noreferrer">
+              <Button variant="secondary">Google Haritalar’da aç</Button>
+            </a>
+          </div>
+        </div>
+        <div className="relative aspect-[4/3] w-full overflow-hidden border border-border bg-ivory md:aspect-[16/10]">
+          <iframe
+            src={STORE_LOCATION.embedUrl}
+            title="Seçkin Çanta mağaza konumu"
+            className="absolute inset-0 h-full w-full border-0"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            allowFullScreen
+          />
         </div>
       </section>
     </div>

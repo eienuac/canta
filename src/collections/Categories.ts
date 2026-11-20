@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { slugField } from '@/fields/auto'
+import { staffWrite } from './access'
 
 export const Categories: CollectionConfig = {
   slug: 'categories',
@@ -14,6 +15,7 @@ export const Categories: CollectionConfig = {
   },
   access: {
     read: () => true,
+    ...staffWrite,
   },
   fields: [
     {

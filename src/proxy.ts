@@ -27,6 +27,8 @@ function buildCsp(nonce: string) {
     "font-src 'self' data:",
     `connect-src 'self' https://*.supabase.co wss://*.supabase.co${isDev ? ' ws://localhost:* http://localhost:*' : ''}`,
     "media-src 'self' https://*.supabase.co",
+    // Google Maps embed (store location on the homepage).
+    'frame-src https://www.google.com https://maps.google.com',
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
