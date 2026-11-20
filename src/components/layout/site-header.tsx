@@ -74,7 +74,7 @@ export function SiteHeader({
           scrolled ? 'border-border/80 bg-cream/95 backdrop-blur' : 'border-transparent bg-cream'
         )}
       >
-        <div className="container-page grid h-16 grid-cols-[1fr_auto_1fr] items-center gap-4 md:h-20">
+        <div className="container-page grid h-16 grid-cols-[1fr_auto] items-center gap-4 md:h-20 md:grid-cols-[1fr_auto_1fr]">
           <div className="flex items-center gap-2">
             <button
               type="button"
