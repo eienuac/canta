@@ -6,8 +6,24 @@ import { getInventoryBySkus } from '@/services/inventory/sync'
 import type { Category, Media, Product } from '@/payload-types'
 import type { ProductCardDTO, ProductDetailDTO, ProductFilters } from '@/types/product'
 import { absoluteUrl } from '@/lib/utils'
+import { toSlug } from '@/fields/auto'
 
 const LOCALE = 'tr' as const
+
+/**
+ * Text search conditions. Slugs are stored without Turkish characters ("sirt-cantasi"), so
+ * matching the transliterated query against the slug finds "canta"/"sirt" as well as "çanta".
+ */
+export function textSearch(q: string): Where[] {
+  const conditions: Where[] = [
+    { name: { contains: q } },
+    { shortDescription: { contains: q } },
+    { sku: { contains: q } },
+  ]
+  const slugQ = toSlug(q)
+  if (slugQ.length >= 2) conditions.push({ slug: { contains: slugQ } })
+  return conditions
+}
 
 const queryOpts = {
   locale: LOCALE,
@@ -114,13 +130,7 @@ async function buildWhere(payload: Payload, filters: ProductFilters): Promise<Wh
     and.push({ price: { less_than_equal: filters.maxPrice } })
   }
   if (filters.q) {
-    and.push({
-      or: [
-        { name: { contains: filters.q } },
-        { shortDescription: { contains: filters.q } },
-        { sku: { contains: filters.q } },
-      ],
-    })
+    and.push({ or: textSearch(filters.q) })
   }
 
   return { and }
@@ -390,13 +400,7 @@ export async function searchSuggestions(q: string) {
         and: [
           { _status: { equals: 'published' } },
           { isActive: { equals: true } },
-          {
-            or: [
-              { name: { contains: q } },
-              { sku: { contains: q } },
-              { shortDescription: { contains: q } },
-            ],
-          },
+          { or: textSearch(q) },
         ],
       },
       depth: 2,
@@ -407,7 +411,7 @@ export async function searchSuggestions(q: string) {
     payload.find({
       collection: 'categories',
       where: {
-        or: [{ name: { contains: q } }, { slug: { contains: q } }],
+        or: [{ name: { contains: q } }, { slug: { contains: toSlug(q) || q } }],
       },
       limit: 4,
       ...queryOpts,
