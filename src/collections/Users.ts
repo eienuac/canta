@@ -1,19 +1,5 @@
-import type { Access, CollectionConfig, FieldAccess } from 'payload'
-
-type RoleUser = { id?: number | string; role?: string | null } | null | undefined
-
-const isAdmin = (user: RoleUser) => user?.role === 'admin'
-
-const adminOnly: Access = ({ req }) => isAdmin(req.user as RoleUser)
-
-const adminOrSelf: Access = ({ req }) => {
-  const user = req.user as RoleUser
-  if (!user) return false
-  if (isAdmin(user)) return true
-  return { id: { equals: user.id as number | string } }
-}
-
-const adminOnlyField: FieldAccess = ({ req }) => isAdmin(req.user as RoleUser)
+import type { CollectionConfig } from 'payload'
+import { adminOnly, adminOnlyField, adminOrSelf, isStaffUser } from './access'
 
 export const Users: CollectionConfig = {
   slug: 'users',
@@ -27,7 +13,9 @@ export const Users: CollectionConfig = {
     group: 'Sistem',
   },
   // Editors may only see/update their own account; only admins manage other accounts.
+  // Accounts without a role cannot open the admin panel at all.
   access: {
+    admin: ({ req }) => isStaffUser(req),
     read: adminOrSelf,
     update: adminOrSelf,
     create: adminOnly,

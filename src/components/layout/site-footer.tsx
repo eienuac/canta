@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { BrandLogo } from '@/components/brand/brand-logo'
+import { STORE_LOCATION } from '@/lib/store-location'
 
 const CUSTOMER = [
   { href: '/account/orders', label: 'Siparişlerim' },
@@ -45,6 +46,14 @@ export function SiteFooter({
           <BrandLogo className="h-16 w-16 md:h-20 md:w-20" />
           <p className="sr-only">{brandName}</p>
           <p className="mt-3 max-w-xs text-sm text-muted">{tagline}</p>
+          <a
+            href={STORE_LOCATION.mapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 block max-w-xs text-sm text-muted underline-offset-4 hover:text-espresso hover:underline"
+          >
+            {STORE_LOCATION.addressLines.join(', ')}
+          </a>
           {kep && <p className="mt-3 max-w-xs text-xs text-muted">KEP: {kep}</p>}
           <div className="mt-6 flex gap-4 text-sm text-espresso">
             {whatsapp && (

@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { syncProductInventory } from '@/services/inventory/sync'
 import { productSkuField, slugField, variantSkuField } from '@/fields/auto'
+import { publishedOrStaff, staffOnlyField, staffWrite } from './access'
 
 export const Products: CollectionConfig = {
   slug: 'products',
@@ -22,14 +23,8 @@ export const Products: CollectionConfig = {
     drafts: true,
   },
   access: {
-    read: ({ req }) => {
-      if (req.user) return true
-      return {
-        _status: {
-          equals: 'published',
-        },
-      }
-    },
+    read: publishedOrStaff,
+    ...staffWrite,
   },
   hooks: {
     afterChange: [
@@ -117,7 +112,7 @@ export const Products: CollectionConfig = {
                   min: 0,
                   defaultValue: 0,
                   // Exact stock counts are internal; the storefront reads them server-side.
-                  access: { read: ({ req }) => Boolean(req.user) },
+                  access: { read: staffOnlyField },
                   admin: {
                     width: '50%',
                     description: 'Varyant eklediyseniz her varyantın kendi stoğu geçerlidir.',
@@ -335,7 +330,7 @@ export const Products: CollectionConfig = {
                       required: true,
                       min: 0,
                       defaultValue: 0,
-                      access: { read: ({ req }) => Boolean(req.user) },
+                      access: { read: staffOnlyField },
                     },
                   ],
                 },
