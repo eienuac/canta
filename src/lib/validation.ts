@@ -53,7 +53,11 @@ export function passwordProblem(password: string, email?: string): string | null
   if (password.length > 72) return 'Şifre en fazla 72 karakter olabilir.'
   if (!/\p{L}/u.test(password) || !/\d/.test(password)) return 'Şifre hem harf hem rakam içermeli.'
   if (/^(.)\1+$/u.test(password)) return 'Şifre aynı karakterin tekrarı olamaz.'
-  const core = password.toLowerCase().replace(/\d+$/, '')
+  // Password without its trailing digits ("qwerty123" -> "qwerty"); a loop, not /\d+$/,
+  // keeps this linear.
+  let end = password.length
+  while (end > 0 && password[end - 1] >= '0' && password[end - 1] <= '9') end--
+  const core = password.slice(0, end).toLowerCase()
   if (isSequential(password) || (core.length >= 4 && isSequential(core))) {
     return 'Şifre "12345678", "abcdefgh", "qwerty" gibi sıralı karakterlerden oluşamaz.'
   }
