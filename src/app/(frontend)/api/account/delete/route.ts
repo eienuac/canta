@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Oturum açmanız gerekiyor.' }, { status: 401 })
 
   if (!(await rateLimit(`account-delete:${user.id}:${await clientIp()}`, 5, 15 * 60_000))) {
     return NextResponse.json({ error: 'Çok fazla deneme' }, { status: 429 })

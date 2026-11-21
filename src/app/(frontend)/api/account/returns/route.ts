@@ -10,7 +10,7 @@ export async function GET() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Oturum açmanız gerekiyor.' }, { status: 401 })
 
   const admin = getSupabaseAdmin()
   const { data } = await admin
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Oturum açmanız gerekiyor.' }, { status: 401 })
 
     if (!(await rateLimit(`returns:${user.id}`, 5, 60_000))) {
       return NextResponse.json({ error: 'Çok fazla istek' }, { status: 429 })

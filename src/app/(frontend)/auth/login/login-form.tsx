@@ -9,6 +9,7 @@ import { Input, Label } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { mergeGuestCartAfterAuth } from '@/hooks/use-cart'
 import { safeRedirectPath } from '@/lib/utils'
+import { authErrorMessage } from '@/lib/auth-errors'
 
 function safeNextPath(raw: string | null): string {
   return safeRedirectPath(raw, '/products')
@@ -39,7 +40,7 @@ export default function LoginForm() {
       toast.success('Giriş başarılı')
       router.push(nextPath === '/products' ? '/account' : nextPath)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Giriş başarısız')
+      toast.error(authErrorMessage(err, 'Giriş yapılamadı. Lütfen tekrar deneyin.'))
     } finally {
       setLoading(false)
     }

@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   try {
     const ip = await clientIp()
     if (!(await rateLimit(`checkout:${ip}`, 10, 60_000))) {
-      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+      return NextResponse.json({ error: 'Çok fazla deneme yaptınız. Lütfen biraz sonra tekrar deneyin.' }, { status: 429 })
     }
 
     const body = await request.json()

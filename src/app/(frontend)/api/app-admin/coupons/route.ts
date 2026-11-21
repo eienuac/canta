@@ -5,7 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export async function POST(request: Request) {
   const admin = await requireAppAdmin()
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!admin) return NextResponse.json({ error: 'Bu işlem için yetkiniz yok.' }, { status: 403 })
 
   const body = z
     .object({

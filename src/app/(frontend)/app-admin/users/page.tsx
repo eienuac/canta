@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { requireAppAdmin } from '@/lib/admin'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { UserRoleActions } from '@/components/admin/user-role-actions'
+import { ROLE_LABELS, labelOf } from '@/lib/labels'
 
 export default async function AdminUsersPage() {
   const admin = await requireAppAdmin()
@@ -28,7 +29,7 @@ export default async function AdminUsersPage() {
               <p className="text-xs text-muted">{u.email}</p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs uppercase tracking-widest text-muted">{u.role}</span>
+              <span className="text-xs uppercase tracking-widest text-muted">{labelOf(ROLE_LABELS, u.role)}</span>
               <UserRoleActions userId={u.id} role={u.role} />
             </div>
           </li>

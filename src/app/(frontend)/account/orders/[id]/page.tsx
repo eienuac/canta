@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { formatPrice } from '@/lib/utils'
-import { ORDER_STATUS_LABELS } from '@/lib/labels'
+import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, labelOf } from '@/lib/labels'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -103,7 +103,7 @@ export default function OrderDetailPage() {
       <h2 className="mt-4 font-display text-3xl text-espresso">{data.order.order_number}</h2>
       <p className="mt-2 text-sm text-muted">
         {ORDER_STATUS_LABELS[data.order.status] || data.order.status} · Ödeme:{' '}
-        {data.order.payment_status}
+        {labelOf(PAYMENT_STATUS_LABELS, data.order.payment_status)}
       </p>
       {data.order.tracking_number && (
         <p className="mt-1 text-sm">Takip no: {data.order.tracking_number}</p>

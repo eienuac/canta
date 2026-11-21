@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { mergeGuestCartAfterAuth } from '@/hooks/use-cart'
 import { safeRedirectPath } from '@/lib/utils'
 import { isValidName, passwordProblem, sanitizeName } from '@/lib/validation'
+import { authErrorMessage } from '@/lib/auth-errors'
 
 function safeNextPath(raw: string | null): string {
   return safeRedirectPath(raw, '/products')
@@ -52,7 +53,7 @@ function RegisterForm() {
       toast.success('Kayıt başarılı')
       router.push(nextPath === '/products' ? '/account' : nextPath)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Kayıt başarısız')
+      toast.error(authErrorMessage(err, 'Kayıt yapılamadı. Lütfen tekrar deneyin.'))
     } finally {
       setLoading(false)
     }

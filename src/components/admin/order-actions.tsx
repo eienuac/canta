@@ -6,7 +6,7 @@ import { Input, Label } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
-import { ORDER_STATUS_LABELS, reviewReasonLabel } from '@/lib/labels'
+import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, REFUND_STATE_LABELS, labelOf, reviewReasonLabel } from '@/lib/labels'
 import { formatPrice } from '@/lib/utils'
 
 const STATUSES = Object.keys(ORDER_STATUS_LABELS)
@@ -111,11 +111,11 @@ export function AdminOrderActions({
             {payments.map((p) => (
               <li key={p.id} className="space-y-2 border-t border-border pt-3 first:border-t-0 first:pt-0">
                 <p>
-                  {p.status} · {formatPrice(Number(p.paid_price ?? p.amount))}
+                  {labelOf(PAYMENT_STATUS_LABELS, p.status)} · {formatPrice(Number(p.paid_price ?? p.amount))}
                   {p.installment && p.installment > 1 ? ` · ${p.installment} taksit` : ''}
                   {p.superseded_at ? ' · eski deneme' : ''}
                   {Number(p.refunded_amount) > 0 ? ` · iade edilen: ${formatPrice(Number(p.refunded_amount))}` : ''}
-                  {p.refund_state !== 'none' ? ` · iade: ${p.refund_state}` : ''}
+                  {p.refund_state !== 'none' ? ` · ${labelOf(REFUND_STATE_LABELS, p.refund_state)}` : ''}
                   {p.refund_reference ? ` (${p.refund_reference})` : ''}
                 </p>
                 {refundable.some((r) => r.id === p.id) && (
@@ -177,7 +177,7 @@ export function AdminOrderActions({
           </select>
         </div>
         <div>
-          <Label>Tracking number</Label>
+          <Label>Kargo takip numarası</Label>
           <Input value={tracking} onChange={(e) => setTracking(e.target.value)} />
         </div>
         <Button

@@ -21,14 +21,14 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     if (!(await rateLimit(`reviews:${await clientIp()}`, 10, 60_000))) {
-      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+      return NextResponse.json({ error: 'Çok fazla deneme yaptınız. Lütfen biraz sonra tekrar deneyin.' }, { status: 429 })
     }
 
     const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Oturum açmanız gerekiyor.' }, { status: 401 })
 
     const body = z
       .object({

@@ -7,7 +7,7 @@ export async function GET() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Oturum açmanız gerekiyor.' }, { status: 401 })
 
   const orders = await listOrdersForUser(user.id)
   return NextResponse.json({ orders })
