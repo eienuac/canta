@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { passwordProblem } from '@/lib/validation'
 
 export default function SecurityPage() {
   const { user } = useAuth()
@@ -27,8 +28,9 @@ export default function SecurityPage() {
   }
 
   async function changePassword() {
-    if (password.length < 8) {
-      toast.error('Yeni şifre en az 8 karakter olmalı')
+    const weak = passwordProblem(password, user?.email)
+    if (weak) {
+      toast.error(weak)
       return
     }
     if (hasPassword && !(await reauthenticate(currentPassword))) {

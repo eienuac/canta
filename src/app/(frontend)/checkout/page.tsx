@@ -11,6 +11,7 @@ import { formatPrice } from '@/lib/utils'
 import { calculateShipping, FREE_SHIPPING_THRESHOLD } from '@/services/shipping'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
+import { isValidName, isValidPhone, sanitizeName, sanitizePhone } from '@/lib/validation'
 
 const STEPS = ['Teslimat', 'Adres', 'Kargo', 'Ödeme', 'Özet'] as const
 const GUEST_KEY = 'sc_guest_token'
@@ -64,10 +65,10 @@ export default function CheckoutPage() {
 
   function validateStep(current: number): string | null {
     if (current <= 1) {
-      if (form.firstName.trim().length < 2) return 'Ad gerekli'
-      if (form.lastName.trim().length < 2) return 'Soyad gerekli'
+      if (!isValidName(form.firstName)) return 'Ad yalnızca harf içermeli (en az 2 harf)'
+      if (!isValidName(form.lastName)) return 'Soyad yalnızca harf içermeli (en az 2 harf)'
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return 'Geçerli e-posta girin'
-      if (form.phone.replace(/\D/g, '').length < 10) return 'Geçerli telefon girin'
+      if (!isValidPhone(form.phone)) return 'Geçerli bir telefon numarası girin (örn. 0555 111 22 33)'
       if (form.city.trim().length < 2) return 'Şehir gerekli'
       if (form.addressLine.trim().length < 5) return 'Adres gerekli'
     }
@@ -215,10 +216,10 @@ export default function CheckoutPage() {
         <div className="space-y-6">
           {(step === 0 || step === 1) && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Ad" value={form.firstName} onChange={(v) => setForm({ ...form, firstName: v })} />
-              <Field label="Soyad" value={form.lastName} onChange={(v) => setForm({ ...form, lastName: v })} />
+              <Field label="Ad" value={form.firstName} onChange={(v) => setForm({ ...form, firstName: sanitizeName(v) })} />
+              <Field label="Soyad" value={form.lastName} onChange={(v) => setForm({ ...form, lastName: sanitizeName(v) })} />
               <Field label="E-posta" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
-              <Field label="Telefon" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
+              <Field label="Telefon" type="tel" value={form.phone} onChange={(v) => setForm({ ...form, phone: sanitizePhone(v) })} />
               <Field label="Şehir" value={form.city} onChange={(v) => setForm({ ...form, city: v })} />
               <Field label="İlçe" value={form.district} onChange={(v) => setForm({ ...form, district: v })} />
               <div className="sm:col-span-2">
@@ -350,15 +351,22 @@ function Field({
   label,
   value,
   onChange,
+  type = 'text',
 }: {
   label: string
   value: string
   onChange: (v: string) => void
+  type?: 'text' | 'tel'
 }) {
   return (
     <div>
       <Label>{label}</Label>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} />
+      <Input
+        type={type}
+        inputMode={type === 'tel' ? 'tel' : undefined}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </div>
   )
 }

@@ -9,6 +9,7 @@ import { Input, Label } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { mergeGuestCartAfterAuth } from '@/hooks/use-cart'
 import { safeRedirectPath } from '@/lib/utils'
+import { isValidName, passwordProblem, sanitizeName } from '@/lib/validation'
 
 function safeNextPath(raw: string | null): string {
   return safeRedirectPath(raw, '/products')
@@ -24,6 +25,15 @@ function RegisterForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!isValidName(form.firstName) || !isValidName(form.lastName)) {
+      toast.error('Ad ve soyad yalnızca harf içermeli (en az 2 harf).')
+      return
+    }
+    const weak = passwordProblem(form.password, form.email)
+    if (weak) {
+      toast.error(weak)
+      return
+    }
     setLoading(true)
     try {
       const supabase = createClient()
@@ -96,7 +106,7 @@ function RegisterForm() {
           <Input
             required
             value={form.firstName}
-            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+            onChange={(e) => setForm({ ...form, firstName: sanitizeName(e.target.value) })}
           />
         </div>
         <div>
@@ -104,7 +114,7 @@ function RegisterForm() {
           <Input
             required
             value={form.lastName}
-            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+            onChange={(e) => setForm({ ...form, lastName: sanitizeName(e.target.value) })}
           />
         </div>
       </div>
@@ -126,6 +136,9 @@ function RegisterForm() {
           value={form.password}
           onChange={(e) => setForm({ ...form, password: e.target.value })}
         />
+        <p className="mt-1 text-xs text-muted">
+          En az 8 karakter; harf ve rakam içermeli. 12345678 gibi sıralı ya da yaygın şifreler kabul edilmez.
+        </p>
       </div>
       <Button type="submit" className="w-full" disabled={loading || googleLoading}>
         {loading ? 'Kaydediliyor…' : 'Kayıt Ol'}

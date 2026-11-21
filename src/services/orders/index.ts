@@ -10,12 +10,13 @@ import { releaseStock, reserveStock } from '@/services/inventory/sync'
 import { calculateShipping } from '@/services/shipping'
 import { getPaymentProvider } from '@/services/payment'
 import { absoluteUrl } from '@/lib/utils'
+import { isValidName, isValidPhone } from '@/lib/validation'
 
 export const checkoutAddressSchema = z.object({
-  firstName: z.string().min(2),
-  lastName: z.string().min(2),
+  firstName: z.string().trim().refine(isValidName, 'Ad yalnızca harf içermeli'),
+  lastName: z.string().trim().refine(isValidName, 'Soyad yalnızca harf içermeli'),
   email: z.string().email(),
-  phone: z.string().min(10),
+  phone: z.string().trim().refine(isValidPhone, 'Geçerli bir telefon numarası girin'),
   city: z.string().min(2),
   district: z.string().optional(),
   neighborhood: z.string().optional(),
