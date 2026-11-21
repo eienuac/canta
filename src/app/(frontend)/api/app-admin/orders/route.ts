@@ -39,7 +39,7 @@ const bodySchema = z.union([
 
 export async function PATCH(request: Request) {
   const admin = await requireAppAdmin()
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!admin) return NextResponse.json({ error: 'Bu işlem için yetkiniz yok.' }, { status: 403 })
 
   try {
     const body = bodySchema.parse(await request.json())

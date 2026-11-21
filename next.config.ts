@@ -15,6 +15,10 @@ const supabaseHost = (() => {
 // src/proxy.ts. Static security headers live here.
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Turkish 404 (src/app/global-not-found.tsx) for URLs outside both root layouts.
+  experimental: {
+    globalNotFound: true,
+  },
   typescript: {
     tsconfigPath: './tsconfig.json',
   },

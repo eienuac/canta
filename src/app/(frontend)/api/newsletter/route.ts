@@ -3,7 +3,7 @@ import { rateLimit, clientIp } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
   if (!(await rateLimit(`newsletter:${await clientIp()}`, 5, 60_000))) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    return NextResponse.json({ error: 'Çok fazla deneme yaptınız. Lütfen biraz sonra tekrar deneyin.' }, { status: 429 })
   }
 
   const form = await request.formData()

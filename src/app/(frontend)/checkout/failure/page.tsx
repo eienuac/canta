@@ -1,5 +1,8 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = { title: 'Ödeme tamamlanamadı', robots: { index: false } }
 
 export default async function CheckoutFailurePage({
   searchParams,

@@ -5,6 +5,9 @@ import { formatPrice } from '@/lib/utils'
 import { ORDER_STATUS_LABELS } from '@/lib/labels'
 import { createClient } from '@/lib/supabase/server'
 import { verifyOrderAccess } from '@/lib/order-token'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = { title: 'Siparişiniz alındı', robots: { index: false } }
 
 export default async function CheckoutSuccessPage({
   searchParams,

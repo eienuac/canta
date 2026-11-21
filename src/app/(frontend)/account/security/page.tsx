@@ -8,6 +8,7 @@ import { Input, Label } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { passwordProblem } from '@/lib/validation'
+import { authErrorMessage } from '@/lib/auth-errors'
 
 export default function SecurityPage() {
   const { user } = useAuth()
@@ -39,7 +40,7 @@ export default function SecurityPage() {
     }
     const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password })
-    if (error) toast.error(error.message)
+    if (error) toast.error(authErrorMessage(error, 'Şifre güncellenemedi. Lütfen tekrar deneyin.'))
     else {
       toast.success('Şifre güncellendi')
       setPassword('')

@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       .parse(await request.json())
 
     const user = await resolveAuthUser(request)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Oturum açmanız gerekiyor.' }, { status: 401 })
 
     try {
       await ensureUserProfile(getSupabaseAdmin(), user)

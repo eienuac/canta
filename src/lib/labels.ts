@@ -9,6 +9,41 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   returned: 'İade Edildi',
 }
 
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Bekliyor',
+  authorized: 'Onaylandı',
+  paid: 'Ödendi',
+  failed: 'Başarısız',
+  refunded: 'İade edildi',
+  partially_refunded: 'Kısmen iade edildi',
+}
+
+export const REFUND_STATE_LABELS: Record<string, string> = {
+  none: '',
+  required: 'İade gerekli',
+  requested: 'İade istendi',
+  processing: 'İade işleniyor',
+  partial: 'Kısmen iade edildi',
+  succeeded: 'İade edildi',
+  failed: 'İade başarısız',
+}
+
+export const ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  customer: 'Müşteri',
+}
+
+export const COUPON_TYPE_LABELS: Record<string, string> = {
+  percent: 'Yüzde',
+  fixed: 'Sabit tutar',
+}
+
+/** Turkish label for a stored code; falls back to the code itself if it is unknown. */
+export function labelOf(labels: Record<string, string>, code: string | null | undefined): string {
+  if (!code) return ''
+  return labels[code] ?? code
+}
+
 export const RETURN_STATUS_LABELS: Record<string, string> = {
   requested: 'Talep oluşturuldu',
   reviewing: 'İnceleniyor',
