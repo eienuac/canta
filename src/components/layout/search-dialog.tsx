@@ -63,7 +63,7 @@ export function SearchDialog({
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Çanta, cüzdan veya SKU ara…"
+          placeholder="Ne aramak istersiniz?"
           className="h-12 w-full border-b border-border bg-transparent text-lg text-espresso outline-none placeholder:text-muted"
         />
         <div className="mt-4 max-h-[60vh] overflow-y-auto">

@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { toast } from 'sonner'
+import { isValidName, isValidPhone, sanitizeName, sanitizePhone } from '@/lib/validation'
 
 export default function AccountProfilePage() {
   const { user } = useAuth()
@@ -31,6 +32,14 @@ export default function AccountProfilePage() {
 
   async function save() {
     if (!user) return
+    if (!isValidName(firstName) || !isValidName(lastName)) {
+      toast.error('Ad ve soyad yalnızca harf içermeli (en az 2 harf).')
+      return
+    }
+    if (phone && !isValidPhone(phone)) {
+      toast.error('Geçerli bir telefon numarası girin (örn. 0555 111 22 33).')
+      return
+    }
     const supabase = createClient()
     const { error } = await supabase
       .from('profiles')
@@ -41,7 +50,7 @@ export default function AccountProfilePage() {
         updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)
-    if (error) toast.error(error.message)
+    if (error) toast.error('Profil kaydedilemedi. Lütfen tekrar deneyin.')
     else toast.success('Profil güncellendi')
   }
 
@@ -55,15 +64,15 @@ export default function AccountProfilePage() {
         </div>
         <div>
           <Label>Ad</Label>
-          <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          <Input value={firstName} onChange={(e) => setFirstName(sanitizeName(e.target.value))} />
         </div>
         <div>
           <Label>Soyad</Label>
-          <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          <Input value={lastName} onChange={(e) => setLastName(sanitizeName(e.target.value))} />
         </div>
         <div>
           <Label>Telefon</Label>
-          <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <Input type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(sanitizePhone(e.target.value))} />
         </div>
         <Button type="button" onClick={save}>
           Kaydet

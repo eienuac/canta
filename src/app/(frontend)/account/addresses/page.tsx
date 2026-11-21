@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { toast } from 'sonner'
+import { isValidName, isValidPhone, sanitizeName, sanitizePhone } from '@/lib/validation'
 
 type Address = {
   id: string
@@ -36,6 +37,13 @@ const EMPTY_FORM = {
   address_line: '',
 }
 
+/** Names accept letters only, the phone digits only, while typing. */
+function cleanField(key: string, value: string) {
+  if (key === 'first_name' || key === 'last_name') return sanitizeName(value)
+  if (key === 'phone') return sanitizePhone(value)
+  return value
+}
+
 export default function AddressesPage() {
   const { user } = useAuth()
   const [addresses, setAddresses] = useState<Address[]>([])
@@ -59,6 +67,14 @@ export default function AddressesPage() {
 
   async function add() {
     if (!user) return
+    if (!isValidName(form.first_name) || !isValidName(form.last_name)) {
+      toast.error('Ad ve soyad yalnızca harf içermeli (en az 2 harf).')
+      return
+    }
+    if (!isValidPhone(form.phone)) {
+      toast.error('Geçerli bir telefon numarası girin (örn. 0555 111 22 33).')
+      return
+    }
     const supabase = createClient()
     const { error } = await supabase.from('addresses').insert({
       user_id: user.id,
@@ -115,7 +131,9 @@ export default function AddressesPage() {
             <Input
               value={form[f.key]}
               maxLength={f.max}
-              onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+              type={f.key === 'phone' ? 'tel' : 'text'}
+              inputMode={f.key === 'phone' ? 'tel' : undefined}
+              onChange={(e) => setForm({ ...form, [f.key]: cleanField(f.key, e.target.value) })}
             />
           </div>
         ))}

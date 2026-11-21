@@ -43,7 +43,7 @@ export function SiteFooter({
     <footer className="mt-24 border-t border-border bg-ivory">
       <div className="container-page grid gap-12 py-16 md:grid-cols-4">
         <div className="md:col-span-1">
-          <BrandLogo className="h-16 w-16 md:h-20 md:w-20" />
+          <BrandLogo className="h-9 md:h-10" />
           <p className="sr-only">{brandName}</p>
           <p className="mt-3 max-w-xs text-sm text-muted">{tagline}</p>
           <a

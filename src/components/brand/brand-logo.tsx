@@ -3,29 +3,24 @@ import Image from 'next/image'
 import { cn } from '@/lib/utils'
 
 type BrandLogoProps = {
+  /** Sets the logo height (e.g. `h-9`); the width follows the wordmark's aspect ratio. */
   className?: string
   priority?: boolean
   href?: string | null
 }
 
+/** Horizontal wordmark (mark + "NuriSeçkin") on a transparent background. */
 export function BrandLogo({ className, priority, href = '/' }: BrandLogoProps) {
   const image = (
-    <span
-      className={cn(
-        'inline-flex shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-black/5',
-        className
-      )}
-    >
-      <Image
-        src="/brand/nuri-seckin-logo.png"
-        alt="Nuri Seçkin"
-        width={800}
-        height={800}
-        sizes="(min-width: 768px) 80px, 64px"
-        priority={priority}
-        className="h-full w-full object-cover"
-      />
-    </span>
+    <Image
+      src="/brand/nuri-seckin-wordmark.png"
+      alt="Nuri Seçkin"
+      width={825}
+      height={174}
+      priority={priority}
+      sizes="(min-width: 768px) 200px, 160px"
+      className={cn('h-8 w-auto shrink-0', className)}
+    />
   )
 
   if (!href) return image
